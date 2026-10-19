@@ -1,0 +1,9 @@
+{
+  "name": "pland-lan-experiment",
+  "private": true,
+  "version": "1.4.0",
+  "type": "module",
+  "scripts": {"test": "node --test test/*.test.mjs", "start": "node server.mjs"},
+  "dependencies": {"ws": "8.18.3"},
+  "devDependencies": {"fake-indexeddb": "6.2.4"}
+}

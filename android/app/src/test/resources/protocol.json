@@ -1,0 +1,4 @@
+[
+ {"version":1,"groupId":"fixture","type":"RECORD","entries":[],"record":{"groupId":"fixture","originId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","revision":2,"updatedAt":1720000000000,"name":"訓練A","latitude":35.681236,"longitude":139.767125,"floor":"2階","room":"北側の寝室","safety":"SOS"},"event":null},
+ {"version":2,"groupId":"fixture","type":"CARE_RECORD","entries":[],"record":null,"event":{"groupId":"fixture","eventId":"dddddddd-dddd-4ddd-8ddd-dddddddddddd","subjectId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","authorId":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","authorName":"確認B","createdAt":1720000000001,"action":"RESCUED","note":"本人を救助。建物全体は未確認","supersedes":null}}
+]

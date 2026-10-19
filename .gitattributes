@@ -1,0 +1,20 @@
+* text=auto
+*.kt text eol=lf
+*.kts text eol=lf
+*.mjs text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.xml text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+gradlew text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+# Preserve the owner's plan exactly, including its current line endings.
+/plan.txt -text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.jar binary

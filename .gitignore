@@ -1,0 +1,46 @@
+# Local implementation snapshots, generated artifacts and reference downloads
+/.implementation/
+/artifacts/
+/dads/
+
+# Android / Gradle / IDE
+**/.gradle/
+**/.kotlin/
+**/.idea/
+**/build/
+**/.cxx/
+**/.externalNativeBuild/
+**/captures/
+**/local.properties
+*.iml
+*.apk
+*.aab
+*.hprof
+
+# Node and local lab state
+**/node_modules/
+**/.local/
+**/test-results/
+**/coverage/
+.env
+.env.*
+!.env.example
+*.log
+
+# Credentials and private signing material
+*.key
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.pem
+*.cer
+*.crt
+# Public test CA required by the existing Android debug resource reference.
+# Contains only a public certificate, never the corresponding private key.
+!/android/app/src/debug/res/raw/plan_lab_ca.pem
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
