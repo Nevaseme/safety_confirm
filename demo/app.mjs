@@ -1,9 +1,9 @@
 import {STATES,CENTER,NOW,CLUSTER_END_ZOOM,hasPosition,buildIndex,getNodes,displayCounts,clusterViewport} from './clustering.mjs?v=5';
 import {people,homes,personLabel} from './data.mjs?v=7';
+import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
-if(!query.has('view')&&window.matchMedia('(max-width:680px)').matches)query.set('view','near');
 const icon=(name)=>`<i class="ph-${['list','x','caret-right','caret-down','crosshair','gear-six'].includes(name)?'bold':'fill'} ph-${name}" aria-hidden="true"></i>`;
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const symbol=state=>`<span class="symbol ${state}" aria-hidden="true">${state==='sos'?'SOS':state==='unanswered'?'?':icon(state==='rescued'?'user-check':'check-fat')}</span>`;
@@ -12,16 +12,15 @@ const age=p=>p.acquiredAt?`${Math.round((NOW-p.acquiredAt)/60000)}分前`:'';
 const sensor=(name,large=false)=>`<span class="${large?'obs-icon':'sensor'} ${name==='enclosed'?'enclosed':''}"><img src="assets/${name==='enclosed'?'enclosed.png':'impact.svg'}" alt="${name==='enclosed'?'閉所':'衝撃'}"></span>`;
 const personById=id=>people.find(p=>p.id===id);
 const homeById=id=>homes.find(h=>h.id===id);
-if(query.has('view'))document.body.classList.add('single');
-const configurations=[{id:'wide',title:'広域',subtitle:'縮尺に合わせて人数を集約',zoom:14.2},{id:'near',title:'拡大',subtitle:'個々の人と建物を確認',zoom:16.8}];
+const config={id:'near',zoom:query.get('view')==='wide'?14.2:16.8};
 
 function createFrame(config){
-  const section=document.createElement('section');section.className=`view ${query.get('view')===config.id?'chosen':''}`;
-  section.innerHTML=`<p class="caption">${config.title}<span>${config.subtitle}</span></p><article class="phone" id="${config.id}-screen">
+  const section=document.createElement('section');section.className='view';
+  section.innerHTML=`<article class="phone" id="${config.id}-screen">
   <header class="top"><button class="plain menu" aria-label="メニュー">${icon('list')}</button><span class="title">地震発生</span><span class="date">10月21日</span></header>
   <div class="tools"><label class="toggle-label">無事を表示<button class="switch" role="switch" aria-label="無事を表示" aria-checked="true"></button></label><button class="unknown">${icon('user')}位置不明 2人${icon('caret-right')}</button></div>
   <div class="map-area"><div class="map" id="${config.id}-map"></div><div class="loading">地図を読み込んでいます</div>
-  <button class="legend-trigger">${icon('stack')}色・記号の意味${icon('caret-right')}</button><button class="recenter" aria-label="表示の中心に戻る">${icon('crosshair')}</button></div>
+  <button class="legend-trigger">${icon('stack')}凡例${icon('caret-right')}</button><button class="recenter" aria-label="表示の中心に戻る">${icon('crosshair')}</button></div>
   <nav class="nav" aria-label="メイン"><button class="active" data-page="map">${icon('map-trifold')}地図</button><button data-page="safety">${icon('user')}安否</button></nav>
   <section class="safety-page" hidden></section>
   <section class="sheet" hidden role="dialog" aria-modal="false" aria-label="詳細"><div class="handle"></div><div class="sheet-head"></div><div class="sheet-body"></div><div class="sheet-footer"></div></section>
@@ -40,7 +39,9 @@ class MapFrame{
     this.map.addControl(new maplibregl.ScaleControl({maxWidth:65,unit:'metric'}),'bottom-left');
     this.map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
     this.map.on('load',()=>this.setupMap());
-    this.map.on('move',()=>{if(!this.pendingFrame){this.pendingFrame=requestAnimationFrame(()=>{this.pendingFrame=null;this.render();});}});
+    // MapLibre moves existing markers. Rebuild cluster membership only at a zoom boundary or after panning.
+    this.map.on('zoom',()=>{if(Math.floor(this.map.getZoom())!==this.renderedZoom&&!this.pendingFrame){this.pendingFrame=requestAnimationFrame(()=>{this.pendingFrame=null;this.render();});}});
+    this.map.on('moveend',()=>this.render());
     this.map.on('click',event=>this.selectBuilding(event));
     phone.querySelector('.switch').onclick=event=>{this.showSafe=!this.showSafe;event.currentTarget.setAttribute('aria-checked',String(this.showSafe));this.index=buildIndex(Supercluster,people,this.showSafe);this.revision++;this.render();};
     phone.querySelector('.legend-trigger').onclick=()=>this.showLegend();
@@ -61,31 +62,37 @@ class MapFrame{
   closeSheet(){this.sheet.hidden=true;this.selected=null;this.render();if(this.returnFocus?.isConnected)this.returnFocus.focus({preventScroll:true});}
   toast(text){const el=this.phone.querySelector('.toast');el.textContent=text;el.hidden=false;clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>el.hidden=true,2600);}
   render(){
-    if(!this.map.loaded()&&!this.map.isStyleLoaded())return;
-    const b=this.map.getBounds(),z=this.map.getZoom();
+    if(!this.map.getLayer('preview-building-rating'))return;
+    const b=this.map.getBounds(),z=this.map.getZoom();this.renderedZoom=Math.floor(z);
     const nodes=getNodes(this.index,[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()],z),shown=new Set();let clusters=0,singles=0;
     for(const feature of nodes){
       const props=feature.properties,isCluster=Boolean(props.cluster),p=isCluster?null:personById(props.personId),bubble=isCluster||z<CLUSTER_END_ZOOM;
       const key=isCluster?`cluster-${props.cluster_id}`:`person-${props.personId}`;shown.add(key);
-      const counts=displayCounts(feature),signature=`${bubble}-${counts.join(',')}-${this.revision}-${this.selected===p?.id}`;
+      const counts=displayCounts(feature),leaves=isCluster?this.index.getLeaves(props.cluster_id,Infinity):[feature];
+      const members=leaves.map(f=>f.properties.personId).join(',');
+      const signature=`${bubble}-${counts.join(',')}-${members}-${p?.s}-${p?.impact}-${p?.enclosed}-${p?.acquiredAt}`;
       if(isCluster)clusters++;else singles++;
       let entry=this.markers.get(key);
       if(entry?.signature!==signature){
-        entry?.marker.remove();const el=document.createElement('button');el.type='button';el.className=bubble?'bubble':`individual${this.selected===p?.id?' selected':''}`;
+        if(entry&&entry.bubble!==bubble){entry.marker.remove();entry=null;}
+        const el=entry?.marker.getElement()||document.createElement('button');el.type='button';el.className=bubble?'bubble':'individual';
         if(bubble){
           el.innerHTML=counts.map((n,i)=>n?`<span class="bubble-row">${symbol(STATES[i])}<strong>${n}<small>人</small></strong></span>`:'').join('');
           el.setAttribute('aria-label',counts.map((n,i)=>n?`${labels[STATES[i]]}${n}人`:'').filter(Boolean).join('、')+(isCluster?'、拡大して見る':`、${personLabel(p)}`));
           el.dataset.total=String(counts.reduce((a,c)=>a+c,0));
-          const leaves=isCluster?this.index.getLeaves(props.cluster_id,Infinity):[feature];el.dataset.memberIds=leaves.map(f=>f.properties.personId).join(',');
+          el.dataset.memberIds=members;
           el.onclick=event=>{event.stopPropagation();this.closeSheet();if(isCluster){const view=clusterViewport(leaves,this.map.getZoom(),this.index.getClusterExpansionZoom(props.cluster_id));this.map.fitBounds(view.bounds,view.options);}else this.openMapPerson(p);};
         }else{
           el.innerHTML=symbol(p.s)+(NOW-p.acquiredAt>5*60000?`<span class="age">${age(p)}</span>`:'')+(p.impact?sensor('impact'):'')+(p.enclosed?sensor('enclosed'):'');
           el.setAttribute('aria-label',`${personLabel(p)}、${labels[p.s]}${p.impact?'、衝撃あり':''}${p.enclosed?'、閉所あり':''}`);el.dataset.personId=p.id;el.dataset.memberIds=p.id;
           el.onclick=event=>{event.stopPropagation();this.openMapPerson(p);};
         }
-        const marker=new maplibregl.Marker({element:el,anchor:bubble?'bottom':'center',offset:bubble?[0,-5]:[0,0]}).setLngLat(feature.geometry.coordinates).addTo(this.map);
-        entry={marker,signature};this.markers.set(key,entry);
-      }else entry.marker.setLngLat(feature.geometry.coordinates);
+        const marker=entry?.marker||new maplibregl.Marker({element:el,anchor:bubble?'bottom':'center',offset:bubble?[0,-5]:[0,0]}).setLngLat(feature.geometry.coordinates).addTo(this.map);
+        entry={marker,signature,bubble};this.markers.set(key,entry);
+      }
+      const position=entry.marker.getLngLat(),[lng,lat]=feature.geometry.coordinates;
+      if(position.lng!==lng||position.lat!==lat)entry.marker.setLngLat(feature.geometry.coordinates);
+      entry.marker.getElement().classList.toggle('selected',!bubble&&this.selected===p?.id);
     }
     for(const [key,entry] of this.markers)if(!shown.has(key)){entry.marker.remove();this.markers.delete(key);}
     this.phone.dataset.zoom=z.toFixed(2);this.phone.dataset.clusters=String(clusters);this.phone.dataset.singles=String(singles);
@@ -136,12 +143,14 @@ class MapFrame{
   selectBuilding(event){
     if(!this.map.getLayer('preview-building-rating'))return;
     const feature=this.map.queryRenderedFeatures(event.point,{layers:['preview-building-rating']})[0];if(!feature)return;
-    const coords=feature.geometry.coordinates[0],center=coords.reduce((sum,c)=>[sum[0]+c[0]/coords.length,sum[1]+c[1]/coords.length],[0,0]);
+    const coords=feature.geometry.type==='Polygon'?feature.geometry.coordinates[0]:feature.geometry.coordinates[0][0];
+    const center=coords.reduce((sum,c)=>[sum[0]+c[0]/coords.length,sum[1]+c[1]/coords.length],[0,0]);
     const home=homes.find(h=>Math.hypot((center[0]-h.location[0])*.84,center[1]-h.location[1])<.00035);
-    if(home)this.showHome(home);else this.openSheet('<h2>建物の詳細</h2>',`<h3>建物の強さ</h3><div class="legend-row"><span class="patch" style="background:${['#FBE8C5','#F2AE5D','#C5672E','#d9dde2'][feature.properties.rating]}"></span>${['強い側','中間','弱い側','不明'][feature.properties.rating]}</div><h3>登録住民</h3><p>この建物にはまだ住民の登録がありません。</p>`);
+    const rating=previewBuildingRating(feature.id);
+    if(home)this.showHome(home);else this.openSheet('<h2>建物の詳細</h2>',`<h3>建物の強さ</h3><div class="legend-row"><span class="patch" style="background:${['#FBE8C5','#F2AE5D','#C5672E','#d9dde2'][rating]}"></span>${['強い側','中間','弱い側','不明'][rating]}</div><h3>登録住民</h3><p>この建物にはまだ住民の登録がありません。</p>`);
   }
   showLegend(){
-    this.openSheet('<h2>色・記号の意味</h2>',`<h3>スマホの安否</h3>${STATES.map(s=>`<div class="legend-row">${symbol(s)}${labels[s]}</div>`).join('')}<h3>スマホの観測</h3><div class="legend-sensors"><div>${sensor('impact',true)}衝撃</div><div>${sensor('enclosed',true)}閉所</div></div><h3>建物の強さ</h3>${['強い側','中間','弱い側','不明'].map((label,i)=>`<div class="legend-row"><span class="patch ${i===3?'legend-unknown':''}" style="${i<3?'background:'+['#FBE8C5','#F2AE5D','#C5672E'][i]:''}"></span>${label}</div>`).join('')}`);
+    this.openSheet('<h2>凡例</h2>',`<h3>スマホの安否</h3>${STATES.map(s=>`<div class="legend-row">${symbol(s)}${labels[s]}</div>`).join('')}<h3>スマホの観測</h3><div class="legend-sensors"><div>${sensor('impact',true)}衝撃</div><div>${sensor('enclosed',true)}閉所</div></div><h3>建物の強さ</h3>${['強い側','中間','弱い側','不明'].map((label,i)=>`<div class="legend-row"><span class="patch ${i===3?'legend-unknown':''}" style="${i<3?'background:'+['#FBE8C5','#F2AE5D','#C5672E'][i]:''}"></span>${label}</div>`).join('')}`);
   }
   showMenu(){this.openSheet('<h2>メニュー</h2>',`<button class="person-row" data-menu="home">${icon('house')}<span class="row-content"><strong>自分の住居・寝室</strong></span>${icon('caret-right')}</button><button class="person-row" data-menu="group">${icon('users')}<span class="row-content"><strong>グループ</strong><small>木山地区</small></span>${icon('caret-right')}</button><button class="person-row" data-menu="map">${icon('download-simple')}<span class="row-content"><strong>地図を保存</strong></span>${icon('caret-right')}</button><button class="person-row" data-menu="settings">${icon('gear-six')}<span class="row-content"><strong>設定</strong></span>${icon('caret-right')}</button>`);this.body.querySelectorAll('[data-menu]').forEach(b=>b.onclick=()=>b.dataset.menu==='home'?this.showHome(homeById('sato')):this.toast('このプレビューでは地図と詳細を確認できます'));}
   showMap(){this.phone.querySelector('.safety-page').hidden=true;this.phone.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page==='map'));this.closeSheet();}
@@ -155,16 +164,14 @@ class MapFrame{
   setupMap(){
     const pattern=new Uint8Array(8*8*4);for(let y=0;y<8;y++)for(let x=0;x<8;x++){const j=(y*8+x)*4,line=(x+y)%8<2;pattern[j]=line?148:218;pattern[j+1]=line?154:221;pattern[j+2]=line?164:225;pattern[j+3]=170;}
     this.map.addImage('unknown-hatch',{width:8,height:8,data:pattern});
-    this.map.addSource('preview-ratings',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    const buildings=this.map.getStyle().layers.find(l=>l.id==='building');
+    const shared={source:buildings.source,'source-layer':buildings['source-layer'],minzoom:buildings.minzoom??12};
+    if(buildings.filter)shared.filter=buildings.filter;
     const before=this.map.getStyle().layers.find(l=>l.type==='symbol')?.id;
-    this.map.addLayer({id:'preview-building-rating',type:'fill',source:'preview-ratings',paint:{'fill-color':['match',['get','rating'],0,'#FBE8C5',1,'#F2AE5D',2,'#C5672E','#D4D7DC'],'fill-opacity':.58,'fill-outline-color':'rgba(133,109,85,0.28)'}},before);
-    this.map.addLayer({id:'preview-building-unknown',type:'fill',source:'preview-ratings',filter:['==',['get','rating'],3],paint:{'fill-pattern':'unknown-hatch','fill-opacity':.60}},before);
-    let dirty=true;this.map.on('moveend',()=>dirty=true);
-    this.map.on('idle',()=>{if(!dirty){this.render();return;}dirty=false;const seen=new Set(),ratings=[];
-      for(const f of this.map.queryRenderedFeatures({layers:['building']}))for(const polygon of f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates){const coords=polygon[0];if(!coords?.length)continue;const key=JSON.stringify(coords);if(seen.has(key))continue;seen.add(key);const [lng,lat]=coords[0];const seed=Math.abs(Math.round(lng*1e6)*31+Math.round(lat*1e6)*17);ratings.push({type:'Feature',geometry:{type:'Polygon',coordinates:polygon},properties:{rating:seed%4}});}
-      this.map.getSource('preview-ratings').setData({type:'FeatureCollection',features:ratings});this.phone.querySelector('.loading').hidden=true;this.phone.dataset.ready='true';this.render();
-    });this.render();
+    this.map.addLayer({id:'preview-building-rating',type:'fill',...shared,paint:{'fill-color':['match',PREVIEW_RATING,0,'#FBE8C5',1,'#F2AE5D',2,'#C5672E','#D4D7DC'],'fill-opacity':.58,'fill-outline-color':'rgba(133,109,85,0.28)'}},before);
+    this.map.addLayer({id:'preview-building-unknown',type:'fill',...shared,filter:buildings.filter?['all',buildings.filter,['==',PREVIEW_RATING,3]]:['==',PREVIEW_RATING,3],paint:{'fill-pattern':'unknown-hatch','fill-opacity':.60}},before);
+    this.phone.querySelector('.loading').hidden=true;this.phone.dataset.ready='true';this.render();
     if(query.get('detail')==='sos')this.openPerson(personById('p0'));
   }
 }
-for(const config of configurations){const phone=createFrame(config);if(query.has('view')&&query.get('view')!==config.id)continue;const frame=new MapFrame(config,phone);frames.push(frame);}
+frames.push(new MapFrame(config,createFrame(config)));
