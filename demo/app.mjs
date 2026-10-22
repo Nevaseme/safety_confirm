@@ -1,6 +1,7 @@
 import {STATES,CENTER,NOW,CLUSTER_END_ZOOM,hasPosition,buildIndex,getNodes,displayCounts,clusterViewport} from './clustering.mjs?v=5';
 import {people,homes,personLabel} from './data.mjs?v=7';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
+import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -9,26 +10,27 @@ const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 const symbol=state=>`<span class="symbol ${state}" aria-hidden="true">${state==='sos'?'SOS':state==='unanswered'?'?':icon(state==='rescued'?'user-check':'check-fat')}</span>`;
 const time=stamp=>new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit',hour12:false}).format(stamp);
 const age=p=>p.acquiredAt?`${Math.round((NOW-p.acquiredAt)/60000)}分前`:'';
-const sensor=(name,large=false)=>`<span class="${large?'obs-icon':'sensor'} ${name==='enclosed'?'enclosed':''}"><img src="assets/${name==='enclosed'?'enclosed.png':'impact.svg'}" alt="${name==='enclosed'?'閉所':'衝撃'}"></span>`;
+const sensor=(name,large=false,enhanced=false)=>`<span class="${large?'obs-icon':'sensor'} ${name==='enclosed'?'enclosed':''}"><img src="assets/${name==='enclosed'?'enclosed.png':enhanced?'impact-collision.svg':'impact.svg'}" alt="${name==='enclosed'?'閉所':'衝撃'}"></span>`;
 const personById=id=>people.find(p=>p.id===id);
 const homeById=id=>homes.find(h=>h.id===id);
 const config={id:'near',zoom:query.get('view')==='wide'?14.2:16.8};
 
 function createFrame(config){
   const section=document.createElement('section');section.className='view';
-  section.innerHTML=`<article class="phone" id="${config.id}-screen">
-  <header class="top"><button class="plain menu" aria-label="メニュー">${icon('list')}</button><span class="title">地震発生</span><span class="date">10月21日</span></header>
+  section.innerHTML=`<h1 class="comparison-label">${config.enhanced?'新しい画面':'これまでの画面'}</h1><article class="phone ${config.enhanced?'enhanced':''}" id="${config.id}-screen">
+  <header class="top"><button class="plain menu" aria-label="メニュー">${icon('list')}</button>${config.enhanced?'<div class="incident-heading"><span class="title">地震発生</span><span class="incident-date">10月21日 14:32 ・ <span data-elapsed>28分前</span></span></div>':'<span class="title">地震発生</span><span class="date">10月21日</span>'}</header>
   <div class="tools"><label class="toggle-label">無事を表示<button class="switch" role="switch" aria-label="無事を表示" aria-checked="true"></button></label><button class="unknown">${icon('user')}位置不明 2人${icon('caret-right')}</button></div>
   <div class="map-area"><div class="map" id="${config.id}-map"></div><div class="loading">地図を読み込んでいます</div>
   <button class="legend-trigger">${icon('stack')}凡例${icon('caret-right')}</button><button class="recenter" aria-label="表示の中心に戻る">${icon('crosshair')}</button></div>
-  <nav class="nav" aria-label="メイン"><button class="active" data-page="map">${icon('map-trifold')}地図</button><button data-page="safety">${icon('user')}安否</button></nav>
+  <nav class="nav" aria-label="メイン"><button class="active" data-page="map">${icon('map-trifold')}地図</button>${config.enhanced?`<button data-page="people">${icon('list-bullets')}一覧</button>`:''}<button data-page="safety">${icon('user')}安否</button></nav>
+  ${config.enhanced?'<section class="people-page" aria-label="メンバー一覧" hidden></section>':''}
   <section class="safety-page" hidden></section>
   <section class="sheet" hidden role="dialog" aria-modal="false" aria-label="詳細"><div class="handle"></div><div class="sheet-head"></div><div class="sheet-body"></div><div class="sheet-footer"></div></section>
   <div class="toast" role="status" hidden></div></article>`;
   document.querySelector('#board').append(section);
   return section.querySelector('.phone');
 }
-function refreshAll(){for(const frame of frames){frame.index=buildIndex(Supercluster,people,frame.showSafe);frame.revision++;frame.render();}}
+function refreshAll(){for(const frame of frames){frame.index=buildIndex(Supercluster,people,frame.showSafe);frame.revision++;frame.render();frame.refreshList?.();}}
 
 class MapFrame{
   constructor(config,phone){
@@ -75,15 +77,20 @@ class MapFrame{
       let entry=this.markers.get(key);
       if(entry?.signature!==signature){
         if(entry&&entry.bubble!==bubble){entry.marker.remove();entry=null;}
-        const el=entry?.marker.getElement()||document.createElement('button');el.type='button';el.className=bubble?'bubble':'individual';
+        const el=entry?.marker.getElement()||document.createElement(bubble&&this.config.enhanced?'div':'button');if(el.tagName==='BUTTON')el.type='button';el.className=bubble?'bubble':'individual';
         if(bubble){
           el.innerHTML=counts.map((n,i)=>n?`<span class="bubble-row">${symbol(STATES[i])}<strong>${n}<small>人</small></strong></span>`:'').join('');
           el.setAttribute('aria-label',counts.map((n,i)=>n?`${labels[STATES[i]]}${n}人`:'').filter(Boolean).join('、')+(isCluster?'、拡大して見る':`、${personLabel(p)}`));
           el.dataset.total=String(counts.reduce((a,c)=>a+c,0));
           el.dataset.memberIds=members;
-          el.onclick=event=>{event.stopPropagation();this.closeSheet();if(isCluster){const view=clusterViewport(leaves,this.map.getZoom(),this.index.getClusterExpansionZoom(props.cluster_id));this.map.fitBounds(view.bounds,view.options);}else this.openMapPerson(p);};
+          if(this.config.enhanced){
+            const rows=el.innerHTML,description=el.getAttribute('aria-label');
+            el.removeAttribute('aria-label');
+            el.innerHTML=`<button class="bubble-main" aria-label="${escape(description)}">${rows}</button><button class="cluster-list" aria-label="このエリアの${leaves.length}人を一覧で見る">${icon('list-bullets')}一覧${icon('caret-right')}</button>`;
+          }
+          el.onclick=event=>{event.stopPropagation();if(this.config.enhanced&&event.target.closest('.cluster-list')){this.showArea(members.split(','),key,feature.geometry.coordinates);return;}this.closeSheet();if(isCluster){const view=clusterViewport(leaves,this.map.getZoom(),this.index.getClusterExpansionZoom(props.cluster_id));this.map.fitBounds(view.bounds,view.options);}else this.openMapPerson(p);};
         }else{
-          el.innerHTML=symbol(p.s)+(NOW-p.acquiredAt>5*60000?`<span class="age">${age(p)}</span>`:'')+(p.impact?sensor('impact'):'')+(p.enclosed?sensor('enclosed'):'');
+          el.innerHTML=symbol(p.s)+(NOW-p.acquiredAt>5*60000?`<span class="age">${age(p)}</span>`:'')+(p.impact?sensor('impact',false,this.config.enhanced):'')+(p.enclosed?sensor('enclosed'):'');
           el.setAttribute('aria-label',`${personLabel(p)}、${labels[p.s]}${p.impact?'、衝撃あり':''}${p.enclosed?'、閉所あり':''}`);el.dataset.personId=p.id;el.dataset.memberIds=p.id;
           el.onclick=event=>{event.stopPropagation();this.openMapPerson(p);};
         }
@@ -92,7 +99,7 @@ class MapFrame{
       }
       const position=entry.marker.getLngLat(),[lng,lat]=feature.geometry.coordinates;
       if(position.lng!==lng||position.lat!==lat)entry.marker.setLngLat(feature.geometry.coordinates);
-      entry.marker.getElement().classList.toggle('selected',!bubble&&this.selected===p?.id);
+      entry.marker.getElement().classList.toggle('selected',bubble?this.areaKey===key:this.selected===p?.id);
     }
     for(const [key,entry] of this.markers)if(!shown.has(key)){entry.marker.remove();this.markers.delete(key);}
     this.phone.dataset.zoom=z.toFixed(2);this.phone.dataset.clusters=String(clusters);this.phone.dataset.singles=String(singles);
@@ -174,4 +181,112 @@ class MapFrame{
     if(query.get('detail')==='sos')this.openPerson(personById('p0'));
   }
 }
+class ListMapFrame extends MapFrame{
+  constructor(config,phone){
+    super(config,phone);
+    this.page='map';this.listFilter='all';this.areaIds=null;this.areaKey=null;this.areaOpen=false;
+    this.peoplePage=phone.querySelector('.people-page');
+    phone.querySelector('[data-page=people]').onclick=()=>this.showList();
+    phone.querySelector('.recenter').onclick=()=>{this.showMap();this.map.flyTo({center:CENTER,zoom:config.zoom});};
+    const openedAt=Date.now();
+    const updateClock=()=>{phone.querySelector('[data-elapsed]').textContent=elapsedLabel(NOW+Date.now()-openedAt);};
+    updateClock();
+    this.clockTimer=setInterval(()=>{if(!document.hidden)updateClock();},60000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)updateClock();});
+  }
+  render(){
+    super.render();
+    // Use the supplied source asset in the new version, including details and legend.
+    this.phone.querySelectorAll('img[src="assets/impact.svg"]').forEach(img=>img.src='assets/impact-collision.svg');
+  }
+  setPage(page){
+    this.page=page;
+    this.peoplePage.hidden=page!=='people';
+    this.phone.querySelector('.safety-page').hidden=page!=='safety';
+    this.phone.querySelector('.tools').inert=page!=='map';
+    this.phone.querySelector('.map-area').inert=page!=='map';
+    this.phone.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+  }
+  showMap(){this.returnArea=null;this.closeSheet();this.setPage('map');this.map.resize();}
+  showSafety(){this.returnArea=null;this.setPage('safety');super.showSafety();}
+  showList(filter='all'){
+    this.returnArea=null;this.closeSheet();this.listFilter=filter;this.setPage('people');this.refreshList();
+    this.peoplePage.querySelector('h2').focus({preventScroll:true});
+  }
+  showUnknown(){this.showList('unknown');}
+  filtersHTML(list,selected){
+    const counts=listCounts(list);
+    return `<div class="people-filters" aria-label="安否で絞り込み">${[['all','全員'],['sos','SOS'],['unanswered','応答なし'],['safe','無事・救助済み']].map(([key,label])=>`<button data-filter="${key}" aria-pressed="${key===selected}" class="filter-${key}">${label} <span>${counts[key]}</span></button>`).join('')}</div>`;
+  }
+  rowsHTML(list){
+    if(!list.length)return '<p class="empty-list" role="status">該当する人はいません</p>';
+    return list.map(p=>{
+      const known=hasPosition(p),home=homeById(p.homeId);
+      return `<button class="person-row" data-id="${escape(p.id)}">${known?symbol(p.s):`<span class="unknown-symbol">${icon('user')}</span>`}<span class="row-content"><strong>${escape(personLabel(p))}</strong><small>${known?`位置更新 ${age(p)}`:`普段の住居：${escape(home.name)}<br>寝室：${escape(p.bedroom)}`}</small></span>${known?`<span class="row-state ${p.s}">${labels[p.s]}</span>`:''}${icon('caret-right')}</button>`;
+    }).join('');
+  }
+  bindList(container,area=false){
+    container.querySelectorAll('[data-filter]').forEach(button=>button.onclick=()=>{
+      const filter=button.dataset.filter;
+      if(area){this.areaFilter=filter;this.paintArea();}else{this.listFilter=filter;this.refreshList();}
+      container.querySelector(`[data-filter="${filter}"]`)?.focus({preventScroll:true});
+    });
+    container.querySelectorAll('[data-id]').forEach(button=>button.onclick=()=>this.openPerson(personById(button.dataset.id)));
+  }
+  refreshList(){
+    if(this.page!=='people')return;
+    const scroll=this.peoplePage.querySelector('.people-rows')?.scrollTop||0;
+    const unknown=listCounts(people).unknown;
+    this.peoplePage.innerHTML=`<div class="people-heading"><h2 tabindex="-1">メンバー一覧</h2><p>グループ全体${this.listFilter==='unknown'?' ・ 位置不明':''}</p></div>${this.filtersHTML(people,this.listFilter)}<button class="unknown-list-link" aria-pressed="${this.listFilter==='unknown'}">${icon('user')}位置不明 ${unknown}人を見る${icon('caret-right')}</button><div class="people-rows">${this.rowsHTML(filterPeople(people,this.listFilter))}</div>`;
+    this.peoplePage.querySelector('.unknown-list-link').onclick=()=>{this.listFilter='unknown';this.refreshList();this.peoplePage.querySelector('.unknown-list-link').focus();};
+    this.bindList(this.peoplePage);
+    this.peoplePage.querySelector('.people-rows').scrollTop=scroll;
+  }
+  showArea(ids,key=null,coordinates=null){
+    this.returnArea=null;this.closeSheet();this.setPage('map');
+    this.areaIds=[...ids];this.areaKey=key;this.areaFilter='all';this.paintArea();this.render();
+    if(coordinates)this.map.easeTo({center:coordinates,offset:[0,-this.map.getContainer().clientHeight*.16],duration:350});
+  }
+  paintArea(){
+    const list=scopedPeople(people,this.areaIds);
+    super.openSheet(`<h2>このエリアの${list.length}人</h2><button class="all-group-link">グループ全体を見る ${icon('caret-right')}</button>`,`${this.filtersHTML(list,this.areaFilter)}<div class="area-rows">${this.rowsHTML(filterPeople(list,this.areaFilter))}</div>`);
+    this.sheet.classList.add('area-sheet');this.areaOpen=true;
+    this.head.querySelector('.all-group-link').onclick=()=>this.showList();
+    this.bindList(this.body,true);
+  }
+  openSheet(title,html,footer=''){
+    this.sheet.classList.remove('area-sheet');this.areaOpen=false;
+    super.openSheet(title,html,footer);
+    this.phone.querySelectorAll('img[src="assets/impact.svg"]').forEach(img=>img.src='assets/impact-collision.svg');
+  }
+  closeSheet(){
+    const back=this.returnArea;
+    this.returnArea=null;this.areaOpen=false;this.areaKey=null;
+    this.sheet.classList.remove('area-sheet');
+    super.closeSheet();
+    if(back){this.areaIds=back.ids;this.areaKey=back.key;this.areaFilter=back.filter;this.paintArea();this.render();}
+  }
+  openPerson(p){
+    if(this.areaOpen)this.returnArea={ids:[...this.areaIds],key:this.areaKey,filter:this.areaFilter};
+    if(!hasPosition(p)){
+      const home=homeById(p.homeId);
+      this.openSheet(`<h2>${escape(personLabel(p))}</h2><p class="location-line">位置不明${p.acquiredAt?' ・ 3日以上更新なし':''}</p>`,`<h3>普段の住居・寝室</h3><div class="home-row"><strong>${escape(home.name)}</strong><button class="link-button" data-home>建物を見る ${icon('caret-right')}</button></div><div class="room">${icon('bed')}<span>${escape(p.bedroom)}</span></div>`);
+      this.body.querySelector('[data-home]').onclick=()=>this.showHome(home,p);
+    }else super.openPerson(p);
+    if(this.returnArea)this.head.querySelector('.sheet-close').setAttribute('aria-label','エリアの一覧に戻る');
+  }
+  showPeople(list){this.showArea(list.map(p=>p.id));}
+  showHome(home,backPerson=null){
+    super.showHome(home,backPerson);
+    this.body.querySelectorAll('[data-id]').forEach(row=>{
+      const p=personById(row.dataset.id);
+      if(!hasPosition(p)){
+        row.querySelector('.symbol').outerHTML=`<span class="unknown-symbol">${icon('user')}</span>`;
+        row.querySelector('small').textContent='位置不明';
+      }
+    });
+  }
+}
 frames.push(new MapFrame(config,createFrame(config)));
+const newConfig={id:'new',zoom:config.zoom,enhanced:true};
+frames.push(new ListMapFrame(newConfig,createFrame(newConfig)));
