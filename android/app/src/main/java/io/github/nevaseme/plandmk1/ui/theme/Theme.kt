@@ -23,7 +23,7 @@ private val Dark = darkColorScheme(primary = Color(0xFFAAC7FF), secondary = Colo
     secondaryContainer=Color(0xFF294756),onSecondaryContainer=Color(0xFFDFEFFA),error=Color(0xFFFFB4AB))
 
 @Composable
-fun PlanDMk1Theme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun PlanDMk1Theme(darkTheme: Boolean = false, content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = if (darkTheme) Dark else Light, typography = Typography,
         shapes=androidx.compose.material3.Shapes(small=androidx.compose.foundation.shape.RoundedCornerShape(8.dp),medium=androidx.compose.foundation.shape.RoundedCornerShape(12.dp),large=androidx.compose.foundation.shape.RoundedCornerShape(20.dp)), content = content)
 }

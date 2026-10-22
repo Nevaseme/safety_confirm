@@ -63,6 +63,7 @@ fun homeLabel(rows: List<PlaceEvent>,person: String): String {
     }},confirmButton={TextButton(enabled=!saving,onClick={model.registerBuilding(building?.buildingId,label,lat,lon){close()}}){Text("建物情報を保存")}},dismissButton={TextButton(enabled=!saving,onClick=close){Text("閉じる")}})
 }
 @Composable fun BuildingDetail(model: PlanViewModel,buildingId: String,onResident: (Resident)->Unit,onClose: ()->Unit,registration: Boolean = false) {
+    val care by model.careEvents.collectAsStateWithLifecycle()
     val rows by model.places.collectAsStateWithLifecycle();val residents by model.residents.collectAsStateWithLifecycle()
     val incident by model.incidentUi.collectAsStateWithLifecycle();val saving by model.saving.collectAsStateWithLifecycle()
     val own=residents.find {it.originId==model.localId};val building=placeBuildings(rows).find {it.buildingId==buildingId}?:return
@@ -87,7 +88,7 @@ fun homeLabel(rows: List<PlaceEvent>,person: String): String {
         }
         HorizontalDivider()
         Text("この建物に登録されている人",style=MaterialTheme.typography.titleMedium)
-        BuildingPeople(rows,buildingId,residents,model.localId,onResident)
+        BuildingPeople(rows,buildingId,residents,model.localId,onResident,care)
         key(incident.selection,buildingId) {BuildingCareEditor(model,buildingId,rows,incident.selection,own!=null&&incident.canEdit,saving)}
     }},confirmButton={TextButton(enabled=!saving,onClick=onClose){Text("閉じる")}})
     if(editing)BuildingForm(model,building,own){editing=false}
@@ -97,6 +98,8 @@ fun homeLabel(rows: List<PlaceEvent>,person: String): String {
     }},confirmButton={TextButton(enabled=!saving,onClick={model.registerUnit(buildingId,unitName,editingUnit){newUnit=false;unitName=""}}){Text("住戸を保存")}},dismissButton={TextButton(enabled=!saving,onClick={newUnit=false}){Text("閉じる")}})
 }
 @Composable private fun BuildingCareEditor(model: PlanViewModel,buildingId: String,rows: List<PlaceEvent>,incident: String,canEdit: Boolean,saving: Boolean) {
+    val people by model.residents.collectAsStateWithLifecycle()
+    val care by model.careEvents.collectAsStateWithLifecycle()
     var action by rememberSaveable {mutableStateOf(BuildingAction.CHECKING)}
     var scope by rememberSaveable {mutableStateOf("")};var unresolved by rememberSaveable {mutableStateOf("")};var note by rememberSaveable {mutableStateOf("")};var supersedes by rememberSaveable {mutableStateOf<String?>(null)}
     val history=buildingCare(rows,buildingId,incident).sortedWith(compareByDescending<PlaceEvent>{it.createdAt}.thenBy {it.eventId})
@@ -105,7 +108,7 @@ fun homeLabel(rows: List<PlaceEvent>,person: String): String {
     if(history.isEmpty())Text("この災害の建物対応記録はありません")
     history.forEach {e->
         Text(e.action!!.label()+if(e.eventId !in heads)"（訂正前）" else "",style=MaterialTheme.typography.titleSmall)
-        Text("記録した人：${samplePersonName(e.groupId,e.authorName)}\n記録日時：${formatTime(e.createdAt)}\n確認範囲：${e.scope}\n未確認事項：${e.unresolved}\n${e.note}")
+        Text("記録した人：${publicRecordAuthor(e.authorId,people,care)}\n記録日時：${formatTime(e.createdAt)}\n確認範囲：${e.scope}\n未確認事項：${e.unresolved}\n${e.note}")
         if(canEdit&&e.authorId==model.localId&&e.eventId in heads)TextButton(enabled=!saving,onClick={supersedes=e.eventId;action=e.action;scope=e.scope;unresolved=e.unresolved;note=e.note}){Text("この建物記録を訂正")}
         HorizontalDivider()
     }

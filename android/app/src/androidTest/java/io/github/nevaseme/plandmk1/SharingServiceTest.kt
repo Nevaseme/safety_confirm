@@ -31,8 +31,9 @@ class SharingServiceTest {
     private val ports = mutableListOf<FakePort>()
     private lateinit var originalFactory: (CoroutineScope) -> NearbyPort
     private lateinit var originalGroup: String
+    private var originalNotificationPrompted = false
     private val group = "test-${UUID.randomUUID().toString().take(8)}"
-    private val notificationDeniedRun get() = InstrumentationRegistry.getArguments().getString("notificationDenied") == "true"
+    private val notificationRetryRun get() = InstrumentationRegistry.getArguments().getString("notificationRetry") == "true"
     private fun main(block: () -> Unit) = instrumentation.runOnMainSync(block)
     private fun waitFor(message: String, check: () -> Boolean) {
         val end = SystemClock.elapsedRealtime() + 10_000
@@ -49,14 +50,17 @@ class SharingServiceTest {
     }
     @Before fun setup() {
         assertTrue("Emulator only", Build.FINGERPRINT.contains("generic") || Build.MODEL.contains("sdk"))
-        (NearbyTransport.permissions().toList() + if (Build.VERSION.SDK_INT >= 33 && !notificationDeniedRun) listOf(Manifest.permission.POST_NOTIFICATIONS) else emptyList()).forEach {
+        if (notificationRetryRun) Assume.assumeTrue("Notification permission requires API 33+", Build.VERSION.SDK_INT >= 33)
+        (NearbyTransport.permissions().toList() + if (Build.VERSION.SDK_INT >= 33 && !notificationRetryRun) listOf(Manifest.permission.POST_NOTIFICATIONS) else emptyList()).forEach {
             shell("pm grant ${app.packageName} $it")
         }
         shell("svc wifi enable"); shell("svc bluetooth enable")
         originalGroup = app.installation.group.value
         originalFactory = app.sharingPortFactory
+        originalNotificationPrompted = app.installation.notificationPrompted
         main {
             app.sharing.stop(); app.installation.setGroup(group)
+            if (notificationRetryRun) app.installation.notificationPrompted = false
             app.sharingPortFactory = { FakePort().also { ports.add(it) } }
         }
         runBlocking { app.store.updateOwn(group, app.installation.localId) {
@@ -66,8 +70,12 @@ class SharingServiceTest {
         waitFor("App foreground") { app.sharing.foreground }
     }
     @After fun cleanup() {
-        main { app.sharing.stop(); app.installation.setGroup(originalGroup); app.sharingPortFactory = originalFactory }
-        scenario.close()
+        if (!::originalFactory.isInitialized) return
+        main {
+            app.sharing.stop(); app.installation.setGroup(originalGroup); app.sharingPortFactory = originalFactory
+            app.installation.notificationPrompted = originalNotificationPrompted
+        }
+        if (::scenario.isInitialized) scenario.close()
         if (Build.VERSION.SDK_INT >= 33) shell("pm grant ${app.packageName} ${Manifest.permission.POST_NOTIFICATIONS}")
         shell("svc wifi enable")
     }
@@ -156,11 +164,53 @@ class SharingServiceTest {
         main { app.installation.setGroup(group) }; start()
     }
 
-    @Test fun notificationDenialDoesNotBlockSharingAndRadioOffStopsIt() {
-        // Revoke POST_NOTIFICATIONS externally before launching this isolated run;
-        // runtime revocation can kill the instrumented process, unlike a real first-run denial.
-        Assume.assumeTrue(notificationDeniedRun)
+    @Test fun notificationPermissionCanBeRequestedAgainAfterDenial() {
+        // Start with POST_NOTIFICATIONS revoked and permission flags cleared externally.
+        // Denial and permission recovery below use the actual system dialog.
+        Assume.assumeTrue(notificationRetryRun && Build.VERSION.SDK_INT >= 33)
         assertFalse(NotificationManagerCompat.from(app).areNotificationsEnabled())
+        compose.onNodeWithContentDescription("メニューを開く").performClick()
+        compose.onNodeWithText("共有・接続").performClick()
+        compose.onNodeWithText("共有開始").performScrollTo().performClick()
+        clickPermissionButton("permission_deny_button")
+        compose.waitForIdle()
+        assertFalse(NotificationManagerCompat.from(app).areNotificationsEnabled())
+        assertTrue("Sharing waits for notification permission", ports.isEmpty())
+
+        scenario.recreate()
+        compose.onNodeWithText("共有開始").performScrollTo().performClick()
+        clickPermissionButton("permission_allow_button")
+        waitFor("Permission granted and sharing started") {
+            NotificationManagerCompat.from(app).areNotificationsEnabled() && app.sharing.state.value.active
+        }
+        assertEquals(1, ports.size)
+        waitFor("Sharing notification displayed") { notifications().any { it.id == SharingService.NOTIFICATION_ID } }
+    }
+
+    private fun clickPermissionButton(id: String) {
+        val automation = instrumentation.uiAutomation
+        val originalFlags = automation.serviceInfo.flags
+        automation.serviceInfo = automation.serviceInfo.apply {
+            flags = flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+        }
+        try {
+            val end = SystemClock.elapsedRealtime() + 10_000
+            while (SystemClock.elapsedRealtime() < end) {
+                val root = automation.rootInActiveWindow
+                val permissionPackage = root?.packageName?.toString()
+                if (permissionPackage?.endsWith("permissioncontroller") == true) {
+                    val button = root?.findAccessibilityNodeInfosByViewId("$permissionPackage:id/$id")?.firstOrNull()
+                    if (button != null && button.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)) return
+                }
+                SystemClock.sleep(50)
+            }
+            fail("System notification permission dialog button not found: $id")
+        } finally {
+            automation.serviceInfo = automation.serviceInfo.apply { flags = originalFlags }
+        }
+    }
+
+    @Test fun radioOffStopsSharing() {
         val p = start(); connect(p, "A")
         assertTrue(app.sharing.state.value.active)
         shell("svc wifi disable")

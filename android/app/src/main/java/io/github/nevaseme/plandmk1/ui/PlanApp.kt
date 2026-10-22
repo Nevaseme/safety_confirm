@@ -52,6 +52,19 @@ fun PlanApp(model: PlanViewModel) {
     val own = residents.find { it.originId == model.localId }
     var tab by rememberSaveable { mutableIntStateOf(1) }
     var lastMain by rememberSaveable { mutableIntStateOf(1) }
+    var preview by rememberSaveable { mutableStateOf(false) }
+    var showPeople by rememberSaveable { mutableStateOf(false) }
+    val firstAnswer = mainDestination(incident.canEdit, incident.current?.answers?.containsKey(model.localId) == true) == MainDestination.ANSWER
+    var awaitingSavedAnswer by rememberSaveable(group, incident.selection) { mutableStateOf(firstAnswer) }
+    val saveStates by model.saveStates.collectAsStateWithLifecycle()
+    var previousSafetyPhase by remember { mutableStateOf(saveStates["safety"]?.phase) }
+    LaunchedEffect(firstAnswer, saveStates["safety"]?.phase) {
+        if (firstAnswer) awaitingSavedAnswer = true
+        else if (awaitingSavedAnswer) { tab = 1; lastMain = 1; awaitingSavedAnswer = false }
+        else if (previousSafetyPhase == SavePhase.SAVING && saveStates["safety"]?.phase == SavePhase.SAVED && tab == 0) { tab = 1; lastMain = 1 }
+        previousSafetyPhase = saveStates["safety"]?.phase
+    }
+    if (preview && BuildConfig.DEBUG) { DesignDemoScreen { preview = false }; return }
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var picking by rememberSaveable { mutableStateOf(false) }
@@ -76,13 +89,32 @@ fun PlanApp(model: PlanViewModel) {
     }
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
-        startWithRadios()
+        if (notificationsEnabled) startWithRadios()
+        else model.sharing.error("通知を許可して、もう一度「共有開始」を押してください")
     }
     fun requestNotificationAndStart() {
-        if (android.os.Build.VERSION.SDK_INT >= 33 && !notificationsEnabled && !model.notificationPrompted) {
+        notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        if (notificationsEnabled) {
+            startWithRadios()
+            return
+        }
+        val activity = generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }
+            .filterIsInstance<android.app.Activity>().firstOrNull()
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
+            (!model.notificationPrompted || activity?.let {
+                androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(it, android.Manifest.permission.POST_NOTIFICATIONS)
+            } == true)) {
             model.notificationPrompted = true
             notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-        } else startWithRadios()
+        } else {
+            val settings = if (android.os.Build.VERSION.SDK_INT >= 26) {
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            } else {
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:${context.packageName}"))
+            }
+            context.startActivity(settings)
+        }
     }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result.values.all { it }) requestNotificationAndStart()
@@ -120,31 +152,38 @@ fun PlanApp(model: PlanViewModel) {
                 listOf(3 to "自分の情報", 2 to "自分の建物・住戸", 4 to "共有・接続", 5 to "オフライン地図", 6 to "災害・訓練の管理", 7 to "アプリ情報").forEach { (destination, label) ->
                     NavigationDrawerItem(label = { Text(label) }, selected = tab == destination, onClick = { navigate(destination) })
                 }
+                if (incident.canEdit && !firstAnswer) NavigationDrawerItem(label = { Text("住民一覧") }, selected = false, onClick = { tab = 1; showPeople = true; scope.launch { drawer.close() } })
+                if (BuildConfig.DEBUG) NavigationDrawerItem(label = { Text("画面デモ") }, selected = false, onClick = { scope.launch { drawer.close(); preview = true } })
             }
         }
     }) {
         Scaffold(
             topBar = { TopAppBar(
-                title = { Text(when { picking -> "住居の位置を選択"; tab in 0..1 -> "PlanD"; else -> when(tab) {2->"自分の建物・住戸";3->"自分の情報";4->"共有・接続";5->"オフライン地図";6->"災害・訓練の管理";else->"アプリ情報"}}, style = MaterialTheme.typography.titleLarge) },
+                title = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(when { picking -> "住居の位置を選択"; tab in 0..1 -> if (incident.canEdit) if (incident.current?.start?.training == true) "訓練" else "地震発生" else "PlanD"; else -> when(tab) {2->"自分の建物・住戸";3->"自分の情報";4->"共有・接続";5->"オフライン地図";6->"災害・訓練の管理";else->"アプリ情報"}}, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                    if (tab in 0..1 && !picking && incident.canEdit) Text(java.text.SimpleDateFormat("M月d日", java.util.Locale.JAPAN).format(Date(incident.current!!.start.createdAt)), style = MaterialTheme.typography.labelLarge)
+                } },
                 navigationIcon = {
                     if (picking || tab !in 0..1) IconButton(onClick = { if(picking){picking=false;tab=3}else tab=lastMain }) { PlanIcon("back", "戻る") }
                     else IconButton(onClick = { scope.launch { drawer.open() } }) { PlanIcon("menu", "メニューを開く") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)) },
-            bottomBar = { if(tab in 0..1 && !picking) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
-                NavigationBarItem(selected=tab==1,onClick={tab=1;lastMain=1},icon={PlanIcon("map",null)},label={Text("地図")})
-                NavigationBarItem(selected=tab==0,onClick={tab=0;lastMain=0},icon={PlanIcon("safety",null)},label={Text("安否登録")})
+            bottomBar = { if(tab in 0..1 && !picking && incident.canEdit && !firstAnswer) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                NavigationBarItem(selected=tab==1,onClick={tab=1;lastMain=1},colors=planNavigationColors(),icon={PlanIcon("map",null)},label={Text("地図")})
+                NavigationBarItem(selected=tab==0,onClick={tab=0;lastMain=0},colors=planNavigationColors(),icon={PlanIcon("person",null)},label={Text("安否")})
             } },
             snackbarHost = { SnackbarHost(snackbar) },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
-                if(tab in 0..1 && !picking) IncidentSelector(model)
                 screenState.SaveableStateProvider(tab) {
-                    when(tab) {
+                    when {
+                        tab in 0..1 && !picking && firstAnswer -> SafetyScreen(model, own, saving, onProfile={navigate(3)}, onIncident={navigate(6)})
+                        tab in 0..1 && !picking && !incident.canEdit -> PeaceHome(model, own != null, onProfile={navigate(3)}, onIncident={navigate(6)}, onPreview={preview=true})
+                        else -> when(tab) {
                         0 -> SafetyScreen(model, own, saving, onProfile={navigate(3)}, onIncident={navigate(6)})
                         1 -> MapScreen(model, residents, own, picking,
                             onPick={model.pickedPoint.value=it;picking=false;tab=3},
-                            onCancelPick={picking=false;tab=3},onSelect={detailId=it.originId},onBuilding={buildingId=it})
+                            onCancelPick={picking=false;tab=3},onSelect={detailId=it.originId},onBuilding={buildingId=it},openList=showPeople,onListClosed={showPeople=false})
                         2 -> BuildingsScreen(model, onProfile={navigate(3)}) {buildingId=it}
                         3 -> SettingsScreen(model, own, group, saving, onBuildings={navigate(2)}, onPick={picking=true;tab=1})
                         4 -> LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
@@ -190,6 +229,7 @@ fun PlanApp(model: PlanViewModel) {
                         }
                         else -> AppInformation()
                     }
+                    }
                 }
             }
         }
@@ -207,25 +247,12 @@ fun PlanApp(model: PlanViewModel) {
     }
     buildingId?.let {id->key(group,incident.selection,id){BuildingDetail(model,id,{buildingId=null;detailId=it.originId},{buildingId=null}, registration = tab == 2)}}
     residents.find { it.originId == detailId }?.let { resident ->
-        AlertDialog(onDismissRequest = { detailId = null }, title = { NamedEntity(if(resident.originId == model.localId) "住民の名前（自分）" else "住民の名前", resident.displayName()) },
-            text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("本人の安否",style=MaterialTheme.typography.labelLarge)
-                SafetyBadge(resident.safety)
-                HorizontalDivider()
-                Text("住まい",style=MaterialTheme.typography.titleMedium)
-                val homeBuilding=validHome(places,resident.originId)?.buildingId
-                if(homeBuilding!=null) {
-                    val home = validHome(places, resident.originId)!!
-                    val building = placeBuildings(places).first { it.buildingId == homeBuilding }
-                    BuildingNameButton(building.displayLabel()) { detailId=null;buildingId=homeBuilding }
-                    Text("部屋・住戸：" + (placeUnits(places,homeBuilding).find {it.unitId == home.unitId}?.label ?: "未登録"))
-                }
-                else Text(homeLabel(places,resident.originId))
-                Text("登録住居：${resident.latitude}, ${resident.longitude}")
-                Text("階数：${resident.floor.ifBlank { "未登録" }}\n寝る部屋：${resident.room.ifBlank { "未登録" }}")
-                Text("更新：${formatTime(resident.updatedAt)}")
-                key(incident.selection) { CareHistoryAndEditor(model, resident, careEvents, own != null && incident.canEdit, saving) }
-            } }, confirmButton = { TextButton(onClick = { detailId = null }) { Text("閉じる") } })
+        val person = residentMapPerson(resident, places, careEvents)
+        ModalBottomSheet(onDismissRequest = { detailId = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+            PersonMapDetail(person, System.currentTimeMillis(), false, false, {}, {},
+                onHome = { home -> if (placeBuildings(places).any { it.buildingId == home.id }) { detailId = null; buildingId = home.id } },
+                onClose = { detailId = null }, history = { CareHistoryAndEditor(model, resident, careEvents, own != null && incident.canEdit, saving) })
+        }
     }
 }
 

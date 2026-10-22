@@ -1,143 +1,91 @@
-# PlanD Mk1 試験手順
+# Androidの試験手順
 
-## 権限エラーの解消（1.1.1）
-
-前回のV2417A / Android 14の8038エラーを調査した結果、PlanD自身の `BLUETOOTH_ADVERTISE` は許可済みでしたが、Google Play開発者サービス側は未許可でした。利用者の明示許可を得てGoogle Play側のこの権限だけを許可すると、同じ端末で1.1 APKの共有開始に成功しました。SDKや通信方式の変更はしていません。
-
-実機で確認した項目：共有開始、`connectedDevice`サービス起動、共有通知と接続0台の表示、通知の「共有停止」によるサービス終了、再開始後にホームへ移動すると接続0台のため停止、アプリに戻っても自動再開しないこと。
-
-1.1.1では、8038エラー発生時にアプリ側とGoogle Play側の権限を区別し、Google Play側の不足を確認できた場合は、その権限設定画面へ案内します。権限を勝手に変更する処理は追加していません。情報不足や別のエラーでは従来の案内を維持します。
-
-検証：JVM23件成功、API37エミュレーターの通信・サービス10項目を確認（通常9項目＋通知拒否の別起動1項目）。ビルド・v2署名検証成功、Lintエラー0件・警告33件。エミュレーターは起動直後のOS応答遅延で一度試験プロセスが停止しましたが、起動完了後の再実行で成功しています。
-
-成果物は `C:/Users/TAKUMI/projects/planD/artifacts/PlanD-Mk1-1.1.1-debug.apk`、今回のログ・結果は `artifacts/nearby-permission` に保存しています。実機には確認に使った1.1版を入れており、1.1.1は別途APKとして用意しています。
-
-実機2台の通信、消灯中の実際の受信・中継、長時間省電力、API 24実行は引き続き未確認です。
-
-## 画面消灯中の共有（1.1）
-
-既存の接続をフォアグラウンドサービスで維持する版です。実機2台の無線通信、長時間の省電力状態、API 24での実行は未確認です。模擬接続の成功を実際の無線通信の継続保証とは扱いません。
-
-### 自動試験
-
-- `SharingSessionTest`：背景の受信・保存・ACK・中継、最後の接続切断、接続0台、復帰、開始・停止の連打、遅延受信、処理待ちの送信取消。
-- `SharingServiceTest`：実際のサービス・Room・アプリの表示状態・通知を使い、通信相手だけを模擬。画面消灯、Activity再作成・破棄後の処理、通知から安否画面への移動と停止、背面での接続0台・最後の切断、開始直後の停止、グループ変更、保存中の開始抑止、通知拒否・Wi-Fi OFFを検証。
-- `NearbyLifecycleTest`：実際の通信アダプターにGoogle APIの模擬応答を注入。探索停止、未承認接続の取消、確立済み接続の維持、復帰時の探索再開、古い接続コールバック、新しい共有を止めない遅延完了、開始エラーの表示を検証。
-
-専用エミュレーターだけで実行します。`SharingServiceTest` は実機で実行しないでください。試験用グループ・住民を保存し、Wi-FiとBluetoothを操作します。通知拒否の試験は、Androidが権限取消で実行中プロセスを終了するため、別起動で行います。
-
-```powershell
-$adb = "$env:LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
-& $adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
-& $adb -s emulator-5554 install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-# 全体検証（通知拒否の1件は別起動）
-& $adb -s emulator-5554 shell am instrument -w io.github.nevaseme.plandmk1.test/androidx.test.runner.AndroidJUnitRunner
-# 実際に通知権限を拒否した状態で、共有開始・無線OFFによる停止を検証
-& $adb -s emulator-5554 shell pm revoke io.github.nevaseme.plandmk1 android.permission.POST_NOTIFICATIONS
-& $adb -s emulator-5554 shell am instrument -w -e notificationDenied true -e class io.github.nevaseme.plandmk1.SharingServiceTest#notificationDenialDoesNotBlockSharingAndRadioOffStopsIt io.github.nevaseme.plandmk1.test/androidx.test.runner.AndroidJUnitRunner
-```
-
-### 実機の追加手順
-
-端末を操作する前に、利用者へ操作内容と所要時間を伝えます。1台の確認は約3分、2台の短時間確認は約10分、長時間試験は時間を別途合意します。
-
-1. 1台で共有開始し、通知の共有状態・接続台数を確認。通知を押して安否画面を開き、通知の「共有停止」でサービスが終了することを確認する。
-2. 接続0台で再度共有開始→ホーム。約1秒後に通知とサービスが終了し、アプリへ戻っても自動開始しないことを確認する。
-3. 2台を手動接続し、Aを消灯または別アプリへ移動。Bで安否変更し、Aへ保存されBへACKが返ることを確認。Aへ戻って情報と探索再開を確認する。
-4. 背面のAとの接続をBから切断し、Aの共有が停止することを確認する。3台用意できたら、Aを背面にしてB→A→Cの中継も確認する。
-5. 共有開始直後の停止、権限拒否・設定での通信権限取消、無線OFF、グループ変更を試す。自動再開せず、再許可・無線ON後の手動開始で復旧することを確認する。
-6. OSによるプロセス終了・強制停止・端末再起動後は共有停止状態で、住民情報と保存地図が残ることを確認する。
-7. 長時間の消灯・省電力状態では端末名、OS、経過時間、切断有無を記録する。省電力による中断があり得るため、常時通信の保証とはしない。
-
-### 今回の実機確認
-
-Android 14 / V2417AでAPK更新、共有開始、権限許可、失敗表示、アプリ再起動後の再試行を実施しました。Androidの権限情報ではBLUETOOTH_ADVERTISE等が許可済みですが、Nearbyは `8038: MISSING_PERMISSION_BLUETOOTH_ADVERTISE` を返しました。サービスは短時間起動後に停止し、エラーを表示しました。当時は原因未特定でした。再開後の解消結果は冒頭の1.1.1節に記載しています。
-
-この端末での継続した通知表示・通知停止・接続0台での背面停止は未確認です。エミュレーターの模擬接続による検証と区別します。実機2台、長時間省電力、API 24、OSの通信権限取消後の復旧試験も保留です。
-
-### 1.1の結果（2026-10-07）
-
-|項目|結果|
-|---|---|
-|JVMテスト|18件成功（既存12件＋共有セッション6件）|
-|API 37エミュレーター|14項目確認：通常起動13項目＋通知拒否の別起動1項目。画面消灯時は実際に画面をOFF、通信相手は模擬|
-|通知|拒否時の共有開始、通知から安否画面へ移動、通知から停止を確認|
-|既存機能|住居登録、安否変更、画面再作成、Room保存、地図の保存・一時停止・再読込の試験が成功|
-|ビルド・署名|debug APK作成成功、v2署名検証成功。versionCode 2 / versionName 1.1|
-|Lint|エラー0件・警告31件（依存ライブラリの更新候補、非推奨API、既存リソース等）|
-|実機Android 14|Nearbyの8038エラーで共有開始できず。権限許可済みの確認と再試行まで実施|
-|レビュー修正|取り消した接続の遅延コールバック、グループ保存中の開始を再現→修正→合格。開始直後の停止によるFGS起動期限エラーも再現→修正→合格|
-
-成果物：`C:/Users/TAKUMI/projects/planD/artifacts/PlanD-Mk1-1.1-debug.apk`。ログは同フォルダーの `background-sharing` に保存。
-
-### 実装判断
-
-- Git管理されていない既存プロジェクトのため、別ブランチは作成せず、元ファイルを保存して反映した。
-- 終了した共有の遅延イベントは接続単位で無視し、グループ保存中は共有開始を無効にした。
-- レビューで挙がった開始エラーの消失は再現しなかった。順序への依存を減らすため、停止状態とエラーを一緒に公開し、表示確認テストを追加した。
-- 常時WakeLock、バッテリー最適化の除外、再起動受信、サービスの自動再開始は追加していない。
-
-仕様参照：[AndroidのconnectedDeviceサービス](https://developer.android.com/develop/background-work/services/fgs/service-types#connected-device)、[通知権限](https://developer.android.com/develop/ui/compose/notifications/notification-permission)、[Nearbyの権限](https://developers.google.com/nearby/connections/android/get-started)。
+対象はリポジトリ内のandroid/。結果は対象版と確認方法を付けて[実装・試験状況](../docs/STATUS.md)へ記録する。新機能の受入条件は[実装計画](../docs/superpowers/plans/2026-10-08-pland-roadmap.md)にまとめる。
 
 ## 自動試験
 
-- `SyncEngineTest`：Windows上で実際の同期処理を3ノード動かし、JSONの送受信を模擬。A→B→Cの中継、更新番号、循環、再接続、グループ分離、破損データ、分割、保存失敗、ACK失敗を検証。
-- `ResidentTest`：入力値と範囲の検証。
-- `StorageTest`：Android上のRoomを閉じて開き直し、情報の保持と古い更新の拒否を検証。
-- `ProfileFlowTest`：画面から住居登録、SOS、Activity再作成後の保持、無事への変更。
-- `OfflineMapTest`：保存開始直後の一時停止、地図の保存完了、保存状態の再読み込み。
+1Aの採用デザインは `DesignFlowTest`、初回回答の保存・画面再作成は `FirstAnswerFlowTest` で確認する。メニューの「画面デモ」で同じ操作を手動確認できる。
 
-模擬通信の合格はBluetooth/Wi-Fiの実機動作を保証しません。
+```powershell
+.\gradlew.bat :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=io.github.nevaseme.plandmk1.DesignFlowTest'
+.\gradlew.bat :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=io.github.nevaseme.plandmk1.FirstAnswerFlowTest'
+```
 
-## 実機2台（端末接続後に実施）
+保存通知などCompose内の時間経過は `mainClock.advanceTimeBy()`、Roomや地図の読み込みは `waitUntil()` で待つ。[公式の同期手順](https://developer.android.com/develop/ui/compose/testing/synchronization)を参照。従来の画面文言・2層切替を前提にしたUI試験は、新画面に合わせた更新が必要。
 
-1. 両方にAPKを入れ、グループ `demo`、表示名 `住民A` / `住民B` と架空の住居を登録する。
-2. 事前に地図保存を完了させる。
-3. モバイルデータとインターネットにつながるWi-Fi接続を切る。BluetoothとWi-Fiの機能自体はONにする。
-4. 双方で共有開始。AからBに接続し、両方でコード一致を確認する。
-5. AでSOSを登録。Bの地図・一覧・詳細に同じ名前、安否、更新日時が現れることを確認する。
-6. Aで無事に変更し、Bにも反映されることを確認する。
-7. 共有停止、端末の無線OFF、アプリ終了をそれぞれ試す。クラッシュせず、再開・再接続すると最新状態が届くことを確認する。
-8. 再接続を繰り返しても人数が増えず、古い安否へ戻らないことを確認する。
-9. Android 12以前の位置情報と、その他の必要権限を拒否してから、設定で許可し直して復旧することを確認する。
-10. 同じ名前でも異なるグループに変更すると他グループの情報を受け取らないことを確認する。
+```powershell
+.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
+```
 
-## 中継（追加端末が用意できたら）
+画面・保存・サービスの試験は専用エミュレーターで行う。テストは住民情報を書き込み、地図保存地域や無線設定を変更する。OfflineMapTestは毎回インターネット接続が必要で、保存済み地域を試験用地域へ置き換える。
 
-A→BでSOSを共有したらAを終了し、Bを再起動する。B→Cだけを接続し、CにAの情報が届くことを確認する。
+```powershell
+$env:ANDROID_SERIAL = "emulator-5554"
+.\gradlew.bat :app:connectedDebugAndroidTest
+```
 
-## 地図・保存
+実際のエミュレーターIDに合わせて設定する。主な試験群：
 
-- 保存完了後にWi-Fi・モバイル通信をOFFにし、アプリを強制終了して開き直す。保存範囲内の地図と住民情報を確認する。
-- 保存途中で通信を切り、戻して保存を再開する。保存済み状態になることを確認する。
-- 保存地図を削除しても住民一覧は残ることを確認する。
-- 保存範囲外・ズーム範囲外の表示は合格条件に含めない。
-
-## 表示・読み上げ
-
-- 文字サイズを最大にして登録、安否変更、接続、詳細表示まで操作する。
-- TalkBackでタブ、入力欄、安否ボタン、共有、住民一覧を操作する。地図の印を使わなくても一覧から詳細を確認できること。
-- API 24と新しいAndroidで実施する。
-
-## 初期MVP（1.0）の結果
-
-2026-10-07に確認。
-
-|項目|結果|
+| 試験 | 確認する内容 |
 |---|---|
-|APKビルド・署名検証|成功（debug APK）|
-|JVMテスト|12件成功：同期9、入力2、テンプレート1|
-|API 37エミュレーターの計測テスト|4件成功：画面、Room、地図、テンプレート。文字200%でも4件成功|
-|実機Android 14（V2417A）の画面操作|成功：登録→SOS→Activity再作成→無事|
-|圏外の地図表示|成功：エミュレーターのWi-Fi・モバイル通信OFF、既定ネットワークなし、アプリ強制終了後に起動。東京駅周辺の地図・住居印・保存済み表示を画面確認|
-|静的検査（Lint）|エラー0件。更新候補、既存の未使用リソース、記法の推奨等の警告あり|
-|実機2台のNearby通信|未確認（2台目待ち）|
-|実機3台の中継|未確認。Windows上の模擬3端末では成功|
-|API 24での実行|未確認。最小SDK設定は24、利用可能なエミュレーターは37のみ|
-|TalkBackの読み上げ操作|未確認。標準部品のラベルと住民一覧を用意済み|
+| SyncEngineTest / CareSyncTest / PlaceSyncTest / IncidentTest | 差分、保存後ACK、再送、訂正、災害と建物の分離 |
+| SharingSessionTest / SharingFailureTest | 共有開始・停止、旧セッション、背景処理 |
+| StorageTest / CareStorageTest / IncidentStorageTest / PlaceStorageTest | Room保存と移行 |
+| ProfileFlowTest / CareFlowTest / IncidentFlowTest / BuildingFlowTest | 登録・安否・救助・建物の操作 |
+| FeedbackFlowTest / NavigationFlowTest / NavigationPresentationTest | 入力保持、操作結果、画面構成 |
+| OfflineMapTest / BuildingMapTest | 地図保存、建物と人の表示 |
+| SharingServiceTest / NearbyLifecycleTest | サービスと模擬接続による受信・保存・ACK・中継 |
 
-実機テストの初回は別アプリへの切替で中断しました。利用者へ待機を案内してから再実行し、成功しています。
+通知権限の再要求はAPI 33以上の専用エミュレーターで別起動する。通知を拒否した後、画面を再作成して再要求・許可し、共有開始と通知表示を確認する。通常実行のスキップは成功に含めない。APKを用意して次を実行する。
 
-エミュレーターだけを指定する場合は、Gradle実行前に `$env:ANDROID_SERIAL = "emulator-5554"` を設定してください。計測テストはテスト用情報を書き込み、地図テストは保存地域を作り直します。
+```powershell
+$adbPath = "$env:LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
+& $adbPath -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
+& $adbPath -s emulator-5554 install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+& $adbPath -s emulator-5554 shell pm revoke io.github.nevaseme.plandmk1 android.permission.POST_NOTIFICATIONS
+& $adbPath -s emulator-5554 shell pm clear-permission-flags io.github.nevaseme.plandmk1 android.permission.POST_NOTIFICATIONS user-set
+& $adbPath -s emulator-5554 shell pm clear-permission-flags io.github.nevaseme.plandmk1 android.permission.POST_NOTIFICATIONS user-fixed
+& $adbPath -s emulator-5554 shell am instrument -w -r -e notificationRetry true -e class io.github.nevaseme.plandmk1.SharingServiceTest#notificationPermissionCanBeRequestedAgainAfterDenial io.github.nevaseme.plandmk1.test/androidx.test.runner.AndroidJUnitRunner
+```
 
-APKと確認画像・ログの控えは `C:/Users/TAKUMI/projects/planD/artifacts` にあります。
+確認画面を再表示できない場合は通知設定を開く。設定で許可して戻り、「共有開始」で再開できることも手動確認する。
+
+## 実験サーバーを使う自動試験
+
+[通信自動試験の手順](LAB_AUTOMATED_TESTING.md)に従い、LabFeedbackTest・IncidentLabTest・PlaceLabTestを個別実行する。接続先・接続コード・グループの渡し方と、返信する相手役の起動を含む。通常の全体実行では、必要引数のないこれらの試験はスキップされる。
+
+## 結果の確認
+
+Gradleの結果は次で確認する。HTMLの集計とXMLの各テストを読み、成功・失敗・スキップを分けて記録する。
+
+| 試験 | HTML | XML |
+|---|---|---|
+| JVM | app/build/reports/tests/ | app/build/test-results/ |
+| Android | app/build/reports/androidTests/connected/ | app/build/outputs/androidTest-results/connected/ |
+
+配下の対象版・端末・実行日時を確認し、XMLのskipped要素がある試験を成功に含めない。通知権限の再要求・実験通信の条件付き試験は、個別実行の結果も確認する。adbによる個別実行は標準出力に結果が出る。
+
+公式資料：[コマンドライン試験](https://developer.android.com/studio/test/command-line)／[AndroidJUnitRunner](https://developer.android.com/reference/androidx/test/runner/AndroidJUnitRunner)。2026-10-20にContext7経由の調査と公式本文で確認。
+
+## Android1台での確認
+
+開始前に操作内容と待機時間を伝える。通知・共有の基本確認は約3分、登録・地図・保存を含む確認は約10分を目安に案内する。
+
+実機操作はADBと画面の文字情報を優先し、操作をまとめて実行する。タップ位置はUIツリーの要素から求める。画像はレイアウト・地図描画の確認や、文字情報で原因を判断できない場合に絞る。入力中はキーボードの表示状態も確認する。試験ランナーが起動できない場合は通常起動とADB操作へ切り替え、ランナーによる試験成功とは分けて記録する。
+
+1. 上書き更新し、既存の住居・建物・対応記録が残ることを確認する。
+2. 登録、災害開始、無事／SOS、個人と建物の対応・訂正を操作する。
+3. Nearby共有開始、通知、通知停止、接続0台で背面へ移ったときの停止を確認する。
+4. 保存済み地図と一覧を通信なしで開き、再起動後の保存状態を確認する。
+5. 権限拒否・再許可、無線OFF・ON、地図保存失敗からの復旧を確認する。
+6. 文字拡大とTalkBackで主要操作を確認する。
+
+## iPhone・Windowsを含む確認
+
+[PWA実験手順](../lab/README.md)を使い、保存後のA→B→C中継と訂正返送を確認する。端末操作の案内は準備と機能試験に分け、相手の接続・受領を確認してから次の操作へ進む。
+
+## 追加Android入手後の確認
+
+Nearby実機間の探索・接続・圏外交換、相手がいる状態での画面消灯・別アプリ中の受信と中継、無線範囲からの離脱・復帰、長時間省電力を確認する。
+
+通信相手を模擬した試験と、無線を使った実機試験は分けて記録する。

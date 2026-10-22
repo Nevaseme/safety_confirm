@@ -1,0 +1,567 @@
+{
+  "reference": 1792562400000,
+  "people": [
+    {
+      "id": "p0",
+      "name": "山田 太郎",
+      "s": "sos",
+      "location": [
+        130.81838679999998,
+        32.790864
+      ],
+      "acquiredAt": 1792562280000,
+      "accuracy": 8,
+      "answeredAt": "14:34",
+      "impact": true,
+      "enclosed": true,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "yamada",
+      "bedroom": "2階・北側の寝室。窓側のベッド。",
+      "memo": "2階の寝室にいます。ドアが開かず、外へ出られません。",
+      "history": []
+    },
+    {
+      "id": "p1",
+      "name": "佐藤 美咲",
+      "s": "sos",
+      "location": [
+        130.819378,
+        32.791024
+      ],
+      "acquiredAt": 1792562220000,
+      "accuracy": 9,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": true,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "sato",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "棚が倒れて通路をふさいでいます。声は出せます。",
+      "history": []
+    },
+    {
+      "id": "p2",
+      "name": "田中 健一",
+      "s": "sos",
+      "location": [
+        130.81971399999998,
+        32.790144
+      ],
+      "acquiredAt": 1792562160000,
+      "accuracy": 10,
+      "answeredAt": "14:34",
+      "impact": true,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "玄関の近くにいます。足を痛めて動けません。",
+      "history": []
+    },
+    {
+      "id": "p3",
+      "name": "山田 花子",
+      "s": "unanswered",
+      "location": [
+        130.81862199999998,
+        32.78984
+      ],
+      "acquiredAt": 1792561320000,
+      "accuracy": 11,
+      "answeredAt": "14:34",
+      "impact": true,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "yamada",
+      "bedroom": "1階・南側の和室。奥の布団。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p4",
+      "name": "鈴木 和子",
+      "s": "unanswered",
+      "location": [
+        130.81908399999998,
+        32.78932
+      ],
+      "acquiredAt": 1792562040000,
+      "accuracy": 12,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p5",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.81984,
+        32.79152
+      ],
+      "acquiredAt": 1792561980000,
+      "accuracy": 13,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "sato",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p6",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.818244,
+        32.789
+      ],
+      "acquiredAt": 1792561920000,
+      "accuracy": 14,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p7",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.81832799999998,
+        32.792
+      ],
+      "acquiredAt": 1792561860000,
+      "accuracy": 8,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p8",
+      "name": "",
+      "s": "rescued",
+      "location": [
+        130.8199072,
+        32.78904
+      ],
+      "acquiredAt": 1792562280000,
+      "accuracy": 9,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": [
+        {
+          "time": "14:46",
+          "author": "自分",
+          "text": "玄関前で本人を確認。屋外へ移動済み。",
+          "action": "救助済み"
+        }
+      ]
+    },
+    {
+      "id": "p9",
+      "name": "加藤 恵子",
+      "s": "sos",
+      "location": [
+        130.82264999999998,
+        32.7952
+      ],
+      "acquiredAt": 1792562220000,
+      "accuracy": 10,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p10",
+      "name": "渡辺 明",
+      "s": "unanswered",
+      "location": [
+        130.82264999999998,
+        32.7956
+      ],
+      "acquiredAt": 1792562160000,
+      "accuracy": 11,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p11",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.82264999999998,
+        32.796
+      ],
+      "acquiredAt": 1792562100000,
+      "accuracy": 12,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p12",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.82309999999998,
+        32.796
+      ],
+      "acquiredAt": 1792562040000,
+      "accuracy": 13,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p13",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.82354999999998,
+        32.796
+      ],
+      "acquiredAt": 1792561980000,
+      "accuracy": 14,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p14",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.82264999999998,
+        32.7964
+      ],
+      "acquiredAt": 1792561920000,
+      "accuracy": 8,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p15",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.82309999999998,
+        32.7964
+      ],
+      "acquiredAt": 1792561860000,
+      "accuracy": 9,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p16",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.82354999999998,
+        32.7964
+      ],
+      "acquiredAt": 1792562280000,
+      "accuracy": 10,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p17",
+      "name": "林 正夫",
+      "s": "unanswered",
+      "location": [
+        130.81445,
+        32.7957
+      ],
+      "acquiredAt": 1792562220000,
+      "accuracy": 11,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p18",
+      "name": "斎藤 洋子",
+      "s": "sos",
+      "location": [
+        130.82264999999998,
+        32.7847
+      ],
+      "acquiredAt": 1792562160000,
+      "accuracy": 12,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p19",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.82264999999998,
+        32.7855
+      ],
+      "acquiredAt": 1792562100000,
+      "accuracy": 13,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p20",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.82309999999998,
+        32.7855
+      ],
+      "acquiredAt": 1792562040000,
+      "accuracy": 14,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p21",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.82354999999998,
+        32.7855
+      ],
+      "acquiredAt": 1792561980000,
+      "accuracy": 8,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p22",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.82264999999998,
+        32.7859
+      ],
+      "acquiredAt": 1792561920000,
+      "accuracy": 9,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "p23",
+      "name": "",
+      "s": "safe",
+      "location": [
+        130.81455,
+        32.7853
+      ],
+      "acquiredAt": 1792561860000,
+      "accuracy": 10,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "unknown1",
+      "name": "森 久美子",
+      "s": "unanswered",
+      "location": null,
+      "acquiredAt": null,
+      "accuracy": 11,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "1階・南側の寝室。奥の布団。",
+      "memo": "",
+      "history": []
+    },
+    {
+      "id": "unknown2",
+      "name": "石井 達也",
+      "s": "unanswered",
+      "location": [
+        130.809,
+        32.800399999999996
+      ],
+      "acquiredAt": 1792216800000,
+      "accuracy": 12,
+      "answeredAt": "14:34",
+      "impact": false,
+      "enclosed": false,
+      "impactAt": "14:32",
+      "enclosedAt": "14:33",
+      "homeId": "tanaka",
+      "bedroom": "2階・東側の部屋。窓の横のベッド。",
+      "memo": "",
+      "history": []
+    }
+  ],
+  "homes": [
+    {
+      "id": "yamada",
+      "name": "木山123-1",
+      "location": [
+        130.81837,
+        32.79081
+      ],
+      "built": 1986,
+      "material": "木造",
+      "floors": 2,
+      "rating": 2
+    },
+    {
+      "id": "sato",
+      "name": "木山123-2",
+      "location": [
+        130.81940999999998,
+        32.79097
+      ],
+      "built": 2004,
+      "material": "木造",
+      "floors": 2,
+      "rating": 1
+    },
+    {
+      "id": "tanaka",
+      "name": "木山124-1",
+      "location": [
+        130.81969999999998,
+        32.79012
+      ],
+      "built": 1995,
+      "material": "木造",
+      "floors": 2,
+      "rating": 1
+    }
+  ]
+}

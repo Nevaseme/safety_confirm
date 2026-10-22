@@ -6,6 +6,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.nevaseme.plandmk1.PlanViewModel
 import io.github.nevaseme.plandmk1.core.*
 import java.text.DateFormat
@@ -24,6 +25,7 @@ fun careSummary(events: List<CareEvent>, subject: String): String {
 
 @Composable
 fun CareHistoryAndEditor(model: PlanViewModel, resident: Resident, events: List<CareEvent>, canEdit: Boolean, saving: Boolean) {
+    val residents by model.residents.collectAsStateWithLifecycle()
     var action by rememberSaveable(resident.originId) { mutableStateOf(CareAction.CHECKING) }
     var note by rememberSaveable(resident.originId) { mutableStateOf("") }
     var supersedes by rememberSaveable(resident.originId) { mutableStateOf<String?>(null) }
@@ -34,7 +36,7 @@ fun CareHistoryAndEditor(model: PlanViewModel, resident: Resident, events: List<
     if (history.isEmpty()) Text("まだ対応記録はありません")
     history.forEach { event ->
         Text(event.action.label() + if (event.eventId !in current) "（訂正前）" else "", style = MaterialTheme.typography.titleSmall)
-        Text("記録した人：${samplePersonName(event.groupId,event.authorName)}\n記録日時：${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(event.createdAt))}")
+        Text("記録した人：${publicRecordAuthor(event.authorId,residents,events)}\n記録日時：${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(event.createdAt))}")
         Text(event.note.ifBlank { "詳細なし" })
         if (event.supersedes != null) Text("訂正記録", style = MaterialTheme.typography.labelSmall)
         if (canEdit && event.authorId == model.localId && event.eventId in current) {

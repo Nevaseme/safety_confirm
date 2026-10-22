@@ -28,19 +28,20 @@ fun residentsByUnit(rows: List<PlaceEvent>, buildingId: String, residents: List<
     return groups + if (unspecified.isEmpty()) emptyList() else listOf(ResidenceGroup(null, "住戸未登録", unspecified))
 }
 
-@Composable fun ResidentEntry(person: Resident, ownId: String, onClick: () -> Unit) {
+@Composable fun ResidentEntry(person: Resident, ownId: String, care: List<CareEvent> = emptyList(), onClick: () -> Unit) {
+    val state = residentMapState(person, care)
     Row(Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = "本人の安否と住まいを見る", onClick = onClick).padding(vertical = 12.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("住民の名前", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(person.displayName() + if(person.originId == ownId) "（自分）" else "", style = MaterialTheme.typography.titleSmall)
+            Text((when(state) { MapSafety.SAFE -> "無事の人"; MapSafety.RESCUED -> "救助済みの人"; else -> person.displayName() }) + if(person.originId == ownId) "（自分）" else "", style = MaterialTheme.typography.titleSmall)
             Text("この人の詳細を見る", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         }
-        SafetyBadge(person.safety)
+        StateSymbol(state)
     }
 }
 
-@Composable fun BuildingPeople(rows: List<PlaceEvent>, buildingId: String, residents: List<Resident>, ownId: String, onResident: (Resident) -> Unit) {
+@Composable fun BuildingPeople(rows: List<PlaceEvent>, buildingId: String, residents: List<Resident>, ownId: String, onResident: (Resident) -> Unit, care: List<CareEvent> = emptyList()) {
     val groups = residentsByUnit(rows, buildingId, residents)
     if(groups.isEmpty()) Text("住民の登録なし", style = MaterialTheme.typography.bodyMedium)
     groups.forEach { group ->
@@ -51,7 +52,7 @@ fun residentsByUnit(rows: List<PlaceEvent>, buildingId: String, residents: List<
             }
             if(group.people.isEmpty()) Text("住民の登録なし", Modifier.padding(vertical=8.dp), style=MaterialTheme.typography.bodySmall)
             group.people.sortedWith(compareBy<Resident> { if(it.safety == Safety.SOS) 0 else 1 }.thenBy { it.name }).forEach { person ->
-                ResidentEntry(person, ownId) { onResident(person) }
+                ResidentEntry(person, ownId, care) { onResident(person) }
             }
         }
     }
