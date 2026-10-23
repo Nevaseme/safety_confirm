@@ -13,7 +13,7 @@ const age=p=>p.acquiredAt?`${Math.round((NOW-p.acquiredAt)/60000)}分前`:'';
 const sensor=(name,large=false,enhanced=false)=>`<span class="${large?'obs-icon':'sensor'} ${name==='enclosed'?'enclosed':''}"><img src="assets/${name==='enclosed'?'enclosed.png':enhanced?'impact-collision.svg':'impact.svg'}" alt="${name==='enclosed'?'閉所':'衝撃'}"></span>`;
 const personById=id=>people.find(p=>p.id===id);
 const homeById=id=>homes.find(h=>h.id===id);
-const config={id:'near',zoom:query.get('view')==='wide'?14.2:16.8,version:'1.5.3 基本画面',summary:'地図と安否の2タブ。比較の基準となる画面です。'};
+const config={zoom:query.get('view')==='wide'?14.2:16.8};
 
 function createFrame(config){
   const section=document.createElement('section');section.className='view';
@@ -318,8 +318,5 @@ class ListMapFrame extends MapFrame{
     });
   }
 }
-frames.push(new MapFrame(config,createFrame(config)));
-const newConfig={id:'new',zoom:config.zoom,enhanced:true,version:'一覧案 v1',summary:'一覧タブ、エリア内の一覧、地震発生からの経過時間を追加した画面案です。'};
-frames.push(new ListMapFrame(newConfig,createFrame(newConfig)));
-const latestConfig={id:'latest',zoom:config.zoom,enhanced:true,localSituation:true,version:'1.5.4 反映案',summary:'一覧案にSOSメモの500文字制限と「メモだけ保存」を追加。安否から操作できます。'};
+const latestConfig={id:'latest',zoom:config.zoom,enhanced:true,localSituation:true,version:'1.5.4 反映案',summary:'地図・一覧・安否の画面見本。今回の追加：SOSメモの500文字制限と「メモだけ保存」。'};
 frames.push(new ListMapFrame(latestConfig,createFrame(latestConfig)));
