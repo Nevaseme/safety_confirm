@@ -26,6 +26,6 @@
 
 「位置を取得→保存→地図用データに反映→停止→再起動後に復元」の実装単位を完了した。第1段階全体の残りである経過時間やエリア一覧ボタンのAndroid移植とは区別する。
 
-次は第2段階のうち、合意済みの人数条件と重複排除を端末内で実装する。後着報告の30分境界・時計ずれ・試験用名簿は確認してから接続する。既存の災害・安否記録は保持する。
+次は第2段階のうち、合意済みの人数条件と重複排除を端末内で実装する。その後の実装・決定は[現在の状況](../../STATUS.md)を参照する。既存の災害・安否記録は保持する。
 
 方式の参照：[Androidのlocationサービス](https://developer.android.com/develop/background-work/services/fgs/service-types#location)、[位置権限](https://developer.android.com/develop/sensors-and-location/location/permissions)。

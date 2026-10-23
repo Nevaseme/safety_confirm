@@ -43,6 +43,13 @@ class ResponseStorageTest {
             assertEquals(6,store.heads("trial").size)
             assertTrue(store.heads("trial").contains(corrected))
             assertEquals(1.0,(store.heads("trial").single {it.change is ResponseChange.Material}.change as ResponseChange.Material).shortfall,0.0)
+            val csv=store.exportCsv("trial",incident,mapOf(target to listOf("A町内会")))
+            assertTrue(csv.startsWith("\uFEFF\"地域\""))
+            assertTrue(csv.contains("\"通報：道路閉塞\""))
+            assertTrue(csv.contains("\"A町内会\""))
+            assertTrue(csv.contains("\"確認へ向かう\""))
+            assertTrue(csv.contains("不足1本"))
+            assertEquals(3,csv.trimEnd().lines().size)
         }finally {db.close();context.deleteDatabase(name)}
     }
 }
