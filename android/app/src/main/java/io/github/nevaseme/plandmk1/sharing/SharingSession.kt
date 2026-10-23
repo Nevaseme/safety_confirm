@@ -14,11 +14,12 @@ class SharingSession(
     parentScope: CoroutineScope,
     private val publish: (NearbyState) -> Unit,
     private val finished: () -> Unit,
+    allowOwnPosition: () -> Boolean = {true},
 ) {
     private val job = SupervisorJob(parentScope.coroutineContext[Job])
     private val scope = CoroutineScope(parentScope.coroutineContext + job)
     private val commands = Channel<suspend () -> Unit>(256)
-    private val engine = SyncEngine(groupId, localId, store, port::send, port::error, port::receipt)
+    private val engine = SyncEngine(groupId, localId, store, port::send, port::error, port::receipt, allowOwnPosition)
     private var started = false
     private var alive = false
     private var foreground = true

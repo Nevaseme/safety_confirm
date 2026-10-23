@@ -48,7 +48,7 @@ import io.github.nevaseme.plandmk1.PlanViewModel
             else -> "安否確認は未開始" })
         Button(enabled=registered&&!saving,onClick={showStart=true},modifier=Modifier.fillMaxWidth()) { Text("地震発生") }
         if(current!=null&&!current.closed) {
-            if(current.start.authorId==model.localId) OutlinedButton(enabled=!saving,onClick={showEnd=true}){Text("この安否確認を終了")}
+            if(model.canEndIncident(current.start.authorId)) OutlinedButton(enabled=!saving,onClick={showEnd=true}){Text("この安否確認を終了")}
         }
         OperationFeedback(model,"incident")
     }

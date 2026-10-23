@@ -7,7 +7,7 @@ import {Router} from './router.mjs';
 const root=path.dirname(fileURLToPath(import.meta.url));
 const config=JSON.parse(fs.readFileSync(path.join(root,'.local/config.json'),'utf8'));
 const router=new Router(config.token);
-const allowed=new Map(['index.html','app.mjs','sync.mjs','feedback.mjs','incidents.mjs','places.mjs','place-ui.mjs','style.css','manifest.webmanifest','sw.js','icon.svg'].map(f=>['/'+f,f]));
+const allowed=new Map(['index.html','app.mjs','sync.mjs','local-situation.mjs','managed-records.mjs','managed-store.mjs','feedback.mjs','incidents.mjs','places.mjs','place-ui.mjs','style.css','manifest.webmanifest','sw.js','icon.svg'].map(f=>['/'+f,f]));
 const mime={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.webmanifest':'application/manifest+json','.svg':'image/svg+xml'};
 const server=https.createServer({key:fs.readFileSync(path.join(root,'.local/server.key')),cert:fs.readFileSync(path.join(root,'.local/server.pem'))},(req,res)=>{
  const url=new URL(req.url,'https://localhost');const file=allowed.get(url.pathname==='/'?'/index.html':url.pathname);

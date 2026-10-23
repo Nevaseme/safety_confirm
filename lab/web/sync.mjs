@@ -1,5 +1,8 @@
 import {validateIncident,normalizeIncident,sameIncident,incidentView,incidentOptions} from './incidents.mjs';
 import {validatePlace,samePlace,preparePlace} from './places.mjs';
+import {validateLocal,newerLocal} from './local-situation.mjs';
+import {ManagedStore} from './managed-store.mjs';
+import {managedIncidentOptions,canonicalIncidentId} from './managed-records.mjs';
 export {incidentView,incidentOptions} from './incidents.mjs';
 const uuid = /^[0-9a-fA-F-]{36}$/;
 export const ACTIONS = {CHECKING:'確認中', NEEDS_HELP:'要救助', RESCUED:'本人の救助完了', REVOKED:'記録を撤回'};
@@ -26,13 +29,17 @@ export function currentEvents(events) {
  const replaced=new Set(events.filter(e=>{const old=byId.get(e.supersedes);return old&&old.authorId===e.authorId&&old.subjectId===e.subjectId&&old.groupId===e.groupId;}).map(e=>e.supersedes));
  return events.filter(e=>!replaced.has(e.eventId));
 }
-export class Store {
- constructor(db){this.db=db;this.name=db.name;}
+export class Store extends ManagedStore {
+ constructor(db){super(db);this.name=db.name;}
  static open(name='pland-lab',factory=globalThis.indexedDB){return new Promise((resolve,reject)=>{
-  const request=factory.open(name,3);
-  request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains('residents')){db.createObjectStore('residents',{keyPath:['groupId','originId']});db.createObjectStore('events',{keyPath:['groupId','eventId']});db.createObjectStore('meta');}if(!db.objectStoreNames.contains('incidents'))db.createObjectStore('incidents',{keyPath:['groupId','eventId']});if(!db.objectStoreNames.contains('places'))db.createObjectStore('places',{keyPath:['groupId','eventId']});};
+  const request=factory.open(name,5);
+  request.onupgradeneeded=()=>{const db=request.result;for(const name of ["rosters","quakes","responses"])if(!db.objectStoreNames.contains(name))db.createObjectStore(name,{keyPath:name==="rosters"?"groupId":["groupId","eventId"]});if(!db.objectStoreNames.contains('positions'))db.createObjectStore('positions',{keyPath:['groupId','originId']});if(!db.objectStoreNames.contains('memos'))db.createObjectStore('memos',{keyPath:['groupId','answerId']});if(!db.objectStoreNames.contains('residents')){db.createObjectStore('residents',{keyPath:['groupId','originId']});db.createObjectStore('events',{keyPath:['groupId','eventId']});db.createObjectStore('meta');}if(!db.objectStoreNames.contains('incidents'))db.createObjectStore('incidents',{keyPath:['groupId','eventId']});if(!db.objectStoreNames.contains('places'))db.createObjectStore('places',{keyPath:['groupId','eventId']});};
   request.onsuccess=()=>{request.result.onversionchange=()=>request.result.close();resolve(new Store(request.result));};request.onerror=()=>reject(request.error);
  });}
+ async positions(group){return (await this.read('positions')).filter(r=>r.groupId===group);}
+ async memos(group){return (await this.read('memos')).filter(r=>r.groupId===group);}
+ savePosition(input){const r=validateLocal(input,true);return this.update('positions',[r.groupId,r.originId],old=>newerLocal(old,r,true));}
+ mergeMemo(input){const r=validateLocal(input,false);return this.update('memos',[r.groupId,r.answerId],old=>newerLocal(old,r,false));}
  close(){this.db.close();}
  read(table,key){return new Promise((resolve,reject)=>{const tx=this.db.transaction(table);const q=key===undefined?tx.objectStore(table).getAll():tx.objectStore(table).get(key);q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);});}
  // Resolve only on transaction completion, never on the individual put's success.
@@ -51,13 +58,16 @@ export class Store {
  async places(group){return (await this.read('places')).filter(e=>e.groupId===group);}
  getPlace(group,id){return this.read('places',[group,id]);}
  placeTransaction(input,local){return new Promise((resolve,reject)=>{
-  const tx=this.db.transaction(local?['places','incidents','residents']:['places'],'readwrite'),s=tx.objectStore('places'),q=s.getAll();let result,problem;
-  const save=(rows,incidents=[])=>{try{
-   const e=local?preparePlace(input,rows.filter(x=>x.groupId===input.groupId),incidents.filter(x=>x.groupId===input.groupId)):validatePlace(input);
+  const tx=this.db.transaction(local?['places','incidents','residents','rosters','quakes']:['places'],'readwrite'),s=tx.objectStore('places'),q=s.getAll();let result,problem;
+  const save=(rows,incidents=[],roster=null,quakes=[])=>{try{
+   if(local&&input.kind==='CARE'&&roster){const canonical=canonicalIncidentId(roster,quakes,input.incidentId);const view=managedIncidentOptions(incidents,roster,quakes).find(v=>v.start.eventId===canonical);require(view&&!view.closed,'成立済みで開始中の災害を指定してください');}
+   const canonical=id=>canonicalIncidentId(roster,quakes,id)??null;
+   const prepared=local?preparePlace({...input,incidentId:canonical(input.incidentId)},rows.filter(x=>x.groupId===input.groupId).map(x=>({...x,incidentId:canonical(x.incidentId)})),incidents.filter(x=>x.groupId===input.groupId)):validatePlace(input);
+   const e=local?{...prepared,incidentId:input.incidentId??null}:prepared;
    const old=rows.find(x=>x.groupId===e.groupId&&x.eventId===e.eventId);if(old){require(samePlace(old,e),'同じIDの建物記録に異なる内容があります');result=false;return;}
    require(!rows.some(x=>x.groupId===e.groupId&&x.authorId===e.authorId&&x.sequence===e.sequence),'同じ更新番号の建物記録に異なる内容があります');s.put(e);result=e;
   }catch(e){problem=e;tx.abort();}};
-  q.onsuccess=()=>{if(!local){save(q.result);return;}const own=tx.objectStore('residents').get([input.groupId,input.authorId]);own.onsuccess=()=>{if(!own.result){problem=Error('先に自分の情報を登録してください');tx.abort();return;}const incidents=tx.objectStore('incidents').getAll();incidents.onsuccess=()=>save(q.result,incidents.result);};};
+  q.onsuccess=()=>{if(!local){save(q.result);return;}const own=tx.objectStore('residents').get([input.groupId,input.authorId]);own.onsuccess=()=>{if(!own.result){problem=Error('先に自分の情報を登録してください');tx.abort();return;}const incidents=tx.objectStore('incidents').getAll();incidents.onsuccess=()=>{const roster=tx.objectStore('rosters').get(input.groupId);roster.onsuccess=()=>{const quakes=tx.objectStore('quakes').getAll();quakes.onsuccess=()=>save(q.result,incidents.result,roster.result,quakes.result);};};};};
   tx.oncomplete=()=>resolve(result);tx.onabort=()=>reject(problem||tx.error||Error('保存が中断されました'));tx.onerror=()=>{};
  });}
  mergePlace(e){return this.placeTransaction(e,false);}
@@ -70,15 +80,16 @@ export class Store {
   };
   tx.oncomplete=()=>resolve(result||'');tx.onabort=()=>reject(tx.error||Error('表示対象を保存できません'));tx.onerror=()=>{};
  });}
- incidentTransaction(make){return new Promise((resolve,reject)=>{
-  const tx=this.db.transaction('incidents','readwrite'),s=tx.objectStore('incidents'),q=s.getAll();let result,problem;
-  q.onsuccess=()=>{try{const e=validateIncident(make(q.result)),old=q.result.find(x=>x.groupId===e.groupId&&x.eventId===e.eventId);if(old){require(sameIncident(old,e),'同じIDの記録に異なる内容があります');result=false;return;}
-   require(!q.result.some(x=>x.groupId===e.groupId&&x.incidentId===e.incidentId&&x.authorId===e.authorId&&x.sequence===e.sequence),'同じ更新番号の記録に異なる内容があります');s.put(e);result=e;
-  }catch(e){problem=e;tx.abort();}};tx.oncomplete=()=>resolve(result);tx.onabort=()=>reject(problem||tx.error||Error('保存が中断されました'));tx.onerror=()=>{};
+ incidentTransaction(make){return this.managedTransaction((tables,put)=>{
+  const rows=tables.incidents,e=validateIncident(make(rows,tables)),old=rows.find(x=>x.groupId===e.groupId&&x.eventId===e.eventId);
+  if(old){require(sameIncident(old,e),'同じIDの記録に異なる内容があります');return false;}
+  require(!rows.some(x=>x.groupId===e.groupId&&x.incidentId===e.incidentId&&x.authorId===e.authorId&&x.sequence===e.sequence),'同じ更新番号の記録に異なる内容があります');put('incidents',e);return e;
  });}
  mergeIncident(e){return this.incidentTransaction(()=>e);}
- appendIncident(e){return this.incidentTransaction(rows=>{
-  const relevant=rows.filter(x=>x.groupId===e.groupId),v=incidentView(relevant,e.incidentId);require(v&&!v.closed,'開始中の災害を選んでください');
+ appendIncident(e){return this.incidentTransaction((rows,tables)=>{
+  const roster=tables.rosters.find(r=>r.groupId===e.groupId),canonical=canonicalIncidentId(roster,tables.quakes,e.incidentId);
+  const relevant=rows.filter(x=>x.groupId===e.groupId),v=managedIncidentOptions(relevant,roster,tables.quakes).find(v=>v.start.eventId===canonical);require(v&&!v.closed,'開始中の災害を選んでください');
+  require(!roster||e.kind!=='END','管理者の災害終了処理を使ってください');
   if(e.kind==='END')require(v.start.authorId===e.authorId,'終了できるのは開始した人だけです');
   if(e.kind==='CARE'&&e.supersedes){const old=v.care.find(x=>x.eventId===e.supersedes);require(old&&old.authorId===e.authorId&&old.subjectId===e.subjectId,'同じ災害の自分の記録だけ訂正できます');}
   const sequence=Math.max(0,...relevant.filter(x=>x.incidentId===e.incidentId&&x.authorId===e.authorId).map(x=>x.sequence))+1;return {...e,sequence};
@@ -93,13 +104,20 @@ export class Store {
  mergeEvent(e){validateEvent(e);return this.update('events',[e.groupId,e.eventId],old=>{if(old){require(sameEvent(old,e),'同じIDの記録に異なる内容があります');return undefined;}return e;});}
 }
 export class SyncEngine {
- constructor(group,id,store,send,onError=()=>{},onReceipt=()=>{}){Object.assign(this,{group,id,store,send,onError,onReceipt});this.peers=new Set();this.pending=new Map();}
+ constructor(group,id,store,send,onError=()=>{},onReceipt=()=>{},allowOwnPosition=()=>true){Object.assign(this,{group,id,store,send,onError,onReceipt,allowOwnPosition});this.peers=new Set();this.pending=new Map();}
  async connected(peer){this.peers.add(peer);await this.guard(()=>this.summary(peer));}
  disconnected(peer){this.peers.delete(peer);for(const key of this.pending.keys())if(key.startsWith(peer+'|'))this.pending.delete(key);}
- async changed(){for(const peer of this.peers)await this.guard(()=>this.summary(peer));}
+ async changed(){this.trimStoppedPosition();for(const peer of this.peers)await this.guard(()=>this.summary(peer));}
  async guard(fn){try{await fn();}catch(e){this.onError(e.message||'同期に失敗しました');}}
  async emit(peer,m){const msg={version:1,groupId:this.group,entries:[],...m};require(new TextEncoder().encode(JSON.stringify(msg)).length<=24000,'通信データが大きすぎます');if(this.peers.has(peer))await this.send(peer,msg);}
+ trimStoppedPosition(){if(!this.allowOwnPosition())for(const key of this.pending.keys())if(key.endsWith('|POSITION|'+this.id))this.pending.delete(key);}
  async summary(peer){
+  await this.journalSummary(peer,true);await this.journalSummary(peer,false);
+  for(const position of [true,false]){
+   const rows=position?await this.store.positions?.(this.group)||[]:await this.store.memos?.(this.group)||[];
+   const entries=rows.filter(r=>!position||r.originId!==this.id||this.allowOwnPosition()).map(r=>({originId:position?r.originId:r.answerId,revision:r.revision}));
+   for(let i=0;i<entries.length;i+=100)await this.emit(peer,{version:5,type:position?'POSITION_SUMMARY':'MEMO_SUMMARY',entries:entries.slice(i,i+100)});
+  }
   const places=await this.store.places?.(this.group)||[];for(let i=0;i<places.length;i+=100)await this.emit(peer,{version:4,type:'PLACE_SUMMARY',entries:places.slice(i,i+100).map(e=>({originId:e.eventId,revision:1}))});
   const journal=await this.store.incidents?.(this.group)||[];for(let i=0;i<journal.length;i+=100)await this.emit(peer,{version:3,type:'INCIDENT_SUMMARY',entries:journal.slice(i,i+100).map(e=>({originId:e.eventId,revision:1}))});
   for(const care of [false,true]){const rows=care?await this.store.events(this.group):await this.store.all(this.group);const entries=rows.map(r=>({originId:care?r.eventId:r.originId,revision:care?1:r.revision}));
@@ -111,6 +129,9 @@ export class SyncEngine {
   await this.guard(async()=>{
    const raw=typeof message==='string'?message:JSON.stringify(message);if(new TextEncoder().encode(raw).length>24000)return;
    const m=JSON.parse(raw);if(!m||m.groupId!==this.group||!Array.isArray(m.entries??[])||(m.entries??[]).length>100)return;
+   this.trimStoppedPosition();
+   if(m.version===6&&typeof m.type==='string'&&(m.type.startsWith('QUAKE_')||m.type.startsWith('RESPONSE_'))){await this.receiveJournal(peer,m);return;}
+   if(m.version===5&&typeof m.type==='string'&&(m.type.startsWith('POSITION_')||m.type.startsWith('MEMO_'))){await this.receiveLocal(peer,m);return;}
    if(m.version===4&&typeof m.type==='string'&&m.type.startsWith('PLACE_')){await this.receivePlace(peer,m);return;}
    if(m.version===3&&typeof m.type==='string'&&m.type.startsWith('INCIDENT_')){await this.receiveIncident(peer,m);return;}
    const care=m.version===2&&typeof m.type==='string'&&m.type.startsWith('CARE_');if(!care&&m.version!==1)return;
@@ -133,6 +154,45 @@ export class SyncEngine {
     for(const e of entries){const key=`${peer}|${care}|${e.originId}`;if(this.pending.get(key)===e.revision){this.pending.delete(key);this.onReceipt({peer,care,...e});}}
    }
   });
+ }
+ async journalSummary(peer,quake){
+  const rows=quake?await this.store.quakeEvents?.(this.group)||[]:await this.store.responseEvents?.(this.group)||[];
+  for(let i=0;i<rows.length;i+=100)await this.emit(peer,{version:6,type:quake?'QUAKE_SUMMARY':'RESPONSE_SUMMARY',entries:rows.slice(i,i+100).map(e=>({originId:e.eventId,revision:1}))});
+ }
+ async receiveJournal(peer,m){
+  const quake=m.type.startsWith('QUAKE_'),prefix=quake?'QUAKE':'RESPONSE',entries=m.entries??[];
+  if(entries.some(e=>!e||!uuid.test(e.originId)||e.revision!==1))return;
+  const rows=quake?await this.store.quakeEvents(this.group):await this.store.responseEvents(this.group),byId=new Map(rows.map(e=>[e.eventId,e]));
+  const emit=(peer,action,props)=>this.emit(peer,{version:6,type:prefix+'_'+action,...props}),action=m.type.slice(prefix.length+1);
+  if(action==='SUMMARY'){
+   const missing=entries.filter(e=>!byId.has(e.originId));if(missing.length)await emit(peer,'REQUEST',{entries:missing});
+  }else if(action==='REQUEST'){
+   for(const e of entries)await this.guard(async()=>{const record=byId.get(e.originId);if(record){this.pending.set(`${peer}|${prefix}|${e.originId}`,1);await emit(peer,'RECORD',{[quake?'quake':'response']:record});}});
+  }else if(action==='RECORD'){
+   const e=quake?m.quake:m.response;if(!e||e.groupId!==this.group)return;
+   const changed=await(quake?this.store.mergeQuake(e,this.id):this.store.mergeResponse(e));
+   await this.guard(()=>emit(peer,'ACK',{entries:[{originId:e.eventId,revision:1}]}));
+   if(changed)for(const other of this.peers)await this.guard(()=>this.journalSummary(other,quake));
+  }else if(action==='ACK')for(const e of entries)if(this.pending.delete(`${peer}|${prefix}|${e.originId}`))this.onReceipt({peer,...e});
+ }
+ async receiveLocal(peer,m){
+  const position=m.type.startsWith('POSITION_'),prefix=position?'POSITION':'MEMO',entries=m.entries??[];
+  if(entries.some(e=>!e||!uuid.test(e.originId)||!Number.isSafeInteger(e.revision)||e.revision<=0))return;
+  const emit=(to,type,data)=>this.emit(to,{version:5,type:prefix+'_'+type,...data});
+  const rows=position?await this.store.positions(this.group):await this.store.memos(this.group);
+  const records=new Map(rows.map(r=>[position?r.originId:r.answerId,r]));
+  const action=m.type.slice(prefix.length+1);
+  if(action==='SUMMARY'){
+   const missing=entries.filter(e=>(!position||e.originId!==this.id)&&(records.get(e.originId)?.revision??0)<e.revision);
+   if(missing.length)await emit(peer,'REQUEST',{entries:missing});
+  }else if(action==='REQUEST'){
+   for(const e of entries){const record=records.get(e.originId);if(!record||(position&&record.originId===this.id&&!this.allowOwnPosition()))continue;
+    this.pending.set(`${peer}|${prefix}|${e.originId}`,record.revision);await emit(peer,'RECORD',position?{position:record}:{memo:record});}
+  }else if(action==='RECORD'){
+   const record=validateLocal(position?m.position:m.memo,position);if(record.groupId!==this.group||(position?record.originId:record.authorId)===this.id)return;
+   const changed=await(position?this.store.savePosition(record):this.store.mergeMemo(record));const entries=[{originId:position?record.originId:record.answerId,revision:record.revision}];
+   await this.guard(()=>emit(peer,'ACK',{entries}));if(changed)for(const other of this.peers)if(other!==peer)await this.guard(()=>emit(other,'SUMMARY',{entries}));
+  }else if(action==='ACK')for(const e of entries){const key=`${peer}|${prefix}|${e.originId}`;if(this.pending.get(key)===e.revision){this.pending.delete(key);this.onReceipt({peer,...e});}}
  }
  async receiveIncident(peer,m){
   const entries=m.entries??[];if(entries.some(e=>!e||!uuid.test(e.originId)||e.revision!==1))return;

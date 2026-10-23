@@ -23,7 +23,7 @@ class PlaceStorageTest {
             old.execSQL("CREATE TABLE incident_events (groupId TEXT NOT NULL,eventId TEXT NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(groupId,eventId))")
             old.execSQL("INSERT INTO incident_events VALUES ('test',?,?)",arrayOf(incidentId,Json.encodeToString(start)));old.version=3
         }
-        fun open()=Room.databaseBuilder(context,PlanDatabase::class.java,name).addMigrations(PlanDatabase.MIGRATION_3_4, PlanDatabase.MIGRATION_4_5).build()
+        fun open()=Room.databaseBuilder(context,PlanDatabase::class.java,name).addMigrations(PlanDatabase.MIGRATION_3_4, PlanDatabase.MIGRATION_4_5, PlanDatabase.MIGRATION_5_6, PlanDatabase.MIGRATION_6_7).build()
         var db=open()
         try {
             var store=RoomRecordStore(db);assertEquals(start,store.incidents("test").single());assertEquals(Safety.SOS,store.all("test").single().safety)

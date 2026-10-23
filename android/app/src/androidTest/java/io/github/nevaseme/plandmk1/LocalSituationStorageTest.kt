@@ -17,10 +17,10 @@ class LocalSituationStorageTest {
     private val context get() = ApplicationProvider.getApplicationContext<Context>()
     private val author = UUID.randomUUID().toString()
     private fun open(name: String) = Room.databaseBuilder(context, PlanDatabase::class.java, name)
-        .addMigrations(PlanDatabase.MIGRATION_1_2, PlanDatabase.MIGRATION_2_3, PlanDatabase.MIGRATION_3_4, PlanDatabase.MIGRATION_4_5).build()
+        .addMigrations(PlanDatabase.MIGRATION_1_2, PlanDatabase.MIGRATION_2_3, PlanDatabase.MIGRATION_3_4, PlanDatabase.MIGRATION_4_5, PlanDatabase.MIGRATION_5_6, PlanDatabase.MIGRATION_6_7).build()
 
     @Test fun everyExistingVersionKeepsRecordsAndNeverInventsPhoneLocations() = runBlocking {
-        for (version in 1..4) {
+        for (version in 1..6) {
             val name = "local-migration-${UUID.randomUUID()}.db"
             val path = context.getDatabasePath(name); path.parentFile!!.mkdirs()
             val schema = InstrumentationRegistry.getInstrumentation().context.assets

@@ -16,8 +16,10 @@ import io.github.nevaseme.plandmk1.sharing.SharingController
 import kotlinx.coroutines.CoroutineScope
 
 class PlanDApplication : Application() {
-    val database by lazy { Room.databaseBuilder(this, PlanDatabase::class.java, "pland.db").addMigrations(PlanDatabase.MIGRATION_1_2, PlanDatabase.MIGRATION_2_3, PlanDatabase.MIGRATION_3_4, PlanDatabase.MIGRATION_4_5).build() }
-    val store by lazy { RoomRecordStore(database) }
+    val database by lazy { Room.databaseBuilder(this, PlanDatabase::class.java, "pland.db").addMigrations(PlanDatabase.MIGRATION_1_2, PlanDatabase.MIGRATION_2_3, PlanDatabase.MIGRATION_3_4, PlanDatabase.MIGRATION_4_5, PlanDatabase.MIGRATION_5_6, PlanDatabase.MIGRATION_6_7).build() }
+    val store by lazy { RoomRecordStore(database,installation.localId) }
+    val quakes by lazy { io.github.nevaseme.plandmk1.data.QuakeStore(database) }
+    val responses by lazy { io.github.nevaseme.plandmk1.data.ResponseStore(database) }
     val offlineMaps by lazy { OfflineMapRepository(this) }
     val installation by lazy { InstallationSettings(this) }
     val sharing by lazy { SharingController(this) }
@@ -27,7 +29,7 @@ class PlanDApplication : Application() {
         val acquire: suspend () -> io.github.nevaseme.plandmk1.location.PositionFix = { source.acquire() }
         acquire
     }
-    val lab by lazy { io.github.nevaseme.plandmk1.lab.LabController(store, installation.localId) }
+    val lab by lazy { io.github.nevaseme.plandmk1.lab.LabController(store, installation.localId) {position.state.value.active} }
     // In-process injection for lifecycle tests, never exposed through IPC or UI.
     var sharingPortFactory: (CoroutineScope) -> NearbyPort = { NearbyTransport(this, it) }
     override fun onCreate() {

@@ -77,7 +77,7 @@ class SharingService : Service() {
                         ServiceCompat.stopForeground(this@SharingService, ServiceCompat.STOP_FOREGROUND_REMOVE)
                         stopSelfResult(startId)
                     }
-                })
+                }, allowOwnPosition = { app.position.state.value.active })
             if (!app.sharing.attach(token, value)) { stopSelfResult(startId); return@launch }
             session = value
             value.start(own.name)

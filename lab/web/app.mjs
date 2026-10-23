@@ -2,13 +2,15 @@ import {Store,SyncEngine,ACTIONS,currentEvents,incidentView,incidentOptions} fro
 import {SaveFeedback,ConnectionFeedback} from './feedback.mjs';
 import {appendScopedIncident} from './incidents.mjs';
 import {createPlaceUi} from './place-ui.mjs';
+import {managedIncidentOptions,canonicalIncidentId,memberFor,quakeStates} from './managed-records.mjs';
 const $=id=>document.getElementById(id), esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const labels={UNREPORTED:'未報告',SAFE:'無事',SOS:'SOS'},time=x=>x?new Date(x).toLocaleString('ja-JP'):'今回未回答';
 const profile=new URL(location.href).searchParams.get('profile')==='C'?'C':'B';
 let store,id,group='demo',records=[],events=[],selected=null,socket=null,engine=null,generation=0,queue=Promise.resolve(),queued=0,receipts=0,dirty=false;
 let syncError='';
 let incidentRows=[],incidentId='',view=null,refreshRevision=0;
-let placeRows=[];
+let placeRows=[],roster=null;
+const canEnd=()=>roster?memberFor(roster,id).role==='ADMIN':view?.start.authorId===id;
 const canAnswer=()=>!!view&&!view.closed;
 const careKey=()=>`care:${group}:${incidentId}:${selected}`;
 const incidentScope=()=>({groupId:group,incidentId,authorId:id});
@@ -22,7 +24,7 @@ function renderFeedback(){
  $('safe').disabled=$('sos').disabled=busy||!own||!canAnswer();
  $('incident-select').disabled=busy;$('incident-open').disabled=busy||!own;
  for(const el of $('incident-form').querySelectorAll('input,button'))el.disabled=busy||!own;
- $('incident-end').disabled=busy||!canAnswer()||view?.start.authorId!==id;
+ $('incident-end').disabled=busy||!canAnswer()||!canEnd();
  $('care-save').disabled=busy||!canAnswer();
  $('profile-save').textContent=saves.get('profile').status==='pending'?'保存しています…':'登録情報を保存';
  $('care-save').textContent=saves.get(careKey()).status==='pending'?'保存しています…':'対応記録を保存';
@@ -48,16 +50,16 @@ document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>tab(b.dataset.t
 function badge(r){return `<span class="badge ${r.safety}">${labels[r.safety]}</span>`;}
 function statusFor(subject){const active=currentEvents(events.filter(e=>e.subjectId===subject));return active.length?active.map(e=>ACTIONS[e.action]).join(' / '):'対応記録なし';}
 async function refresh(){
- const epoch=++refreshRevision,g=group;const [raw,legacy,journal,selection,places]=await Promise.all([store.all(g),store.events(g),store.incidents(g),store.resolveIncidentSelection(g),store.places(g)]);if(epoch!==refreshRevision||g!==group)return;
- placeRows=places;
- incidentRows=journal;const options=incidentOptions(journal),active=options.filter(v=>!v.closed);
+ const epoch=++refreshRevision,g=group;const [raw,legacy,journal,savedSelection,places,participants,quakes]=await Promise.all([store.all(g),store.events(g),store.incidents(g),store.resolveIncidentSelection(g),store.places(g),store.roster(g),store.quakeEvents(g)]);if(epoch!==refreshRevision||g!==group)return;
+ placeRows=places.map(e=>({...e,incidentId:canonicalIncidentId(participants,quakes,e.incidentId)??null}));roster=participants;const selection=canonicalIncidentId(roster,quakes,savedSelection);
+ incidentRows=journal;const options=managedIncidentOptions(journal,roster,quakes),active=options.filter(v=>!v.closed);
  const next=selection==='legacy'||options.some(v=>v.start.eventId===selection)?selection:'';
  if(next!==incidentId){incidentId=next;selected=null;$('note').value='';$('action').value='CHECKING';$('supersedes').value='';saves.clearOtherResults();}
- view=incidentView(journal,incidentId);
+ view=options.find(v=>v.start.eventId===incidentId)||null;
  records=incidentId==='legacy'?raw:raw.map(r=>({...r,safety:view?.answers[r.originId]?.safety||'UNREPORTED',updatedAt:view?.answers[r.originId]?.createdAt||0}));
  events=incidentId==='legacy'?legacy:view?.care||[];
  $('incident-select').innerHTML='<option value="">災害を選択してください</option>'+options.map(v=>`<option value="${v.start.eventId}">${esc(v.start.training?'訓練':'地震')}：${esc(v.start.title)}・${esc(v.start.area)}${v.closed?'（終了）':''} [${v.start.eventId.slice(0,8)}]</option>`).join('')+'<option value="legacy">過去の情報（災害未分類・閲覧のみ）</option>';$('incident-select').value=incidentId;
- $('incident-state').textContent=view?`${view.start.training?'訓練':'地震'}・${view.closed?'終了・閲覧のみ':'安否確認中'}：${view.start.title}／${view.start.area}。開始：${time(view.start.createdAt)}、${view.start.authorName}${!view.closed&&view.start.authorId!==id?'。終了できるのは開始した人だけです。':''}`:incidentId==='legacy'?'以前の安否・対応記録です。今回の地震への回答ではありません。':active.length>1?'複数の安否確認があります。対象を選択してください。':'安否確認は始まっていません。「地震発生」から開始できます。';
+ $('incident-state').textContent=view?`${view.start.training?'訓練':'地震'}・${view.closed?'終了・閲覧のみ':'安否確認中'}：${view.start.title}／${view.start.area}。開始：${time(view.start.createdAt)}、${view.start.authorName}${!view.closed&&!canEnd()?(roster?'。終了は管理者が行います。':'。終了できるのは開始した人だけです。'):''}`:incidentId==='legacy'?'以前の安否・対応記録です。今回の地震への回答ではありません。':active.length>1?'複数の安否確認があります。対象を選択してください。':'安否確認は始まっていません。「地震発生」から開始できます。';
  const own=records.find(r=>r.originId===id);
  $('own').innerHTML=own?`<strong>${esc(own.name)}</strong> ${badge(own)}<p>${own.updatedAt?'安否更新 '+esc(time(own.updatedAt)):'今回の回答はまだありません'}</p>`:'先に「登録・接続」で自分の情報を登録してください。';
  if(own&&!dirty){$('name').value=own.name;$('lat').value=own.latitude;$('lon').value=own.longitude;$('floor').value=own.floor;$('room').value=own.room;}
@@ -120,9 +122,9 @@ $('incident-select').onchange=()=>task(async()=>{if(saves.busy)return;await stor
 $('incident-open').onclick=()=>{$('incident-form').hidden=!$('incident-form').hidden;};
 $('incident-form').onsubmit=e=>{e.preventDefault();if(saves.busy)return;task(async()=>{let created;await saves.run('incident',async()=>{
  const own=await store.get(group,id);if(!own)throw Error('先に登録してください');const eventId=crypto.randomUUID();
- created={groupId:group,eventId,incidentId:eventId,authorId:id,authorName:own.name,createdAt:Date.now(),sequence:1,kind:'START',title:$('incident-title').value.trim(),area:$('incident-area').value.trim(),training:$('incident-training').checked};await store.mergeIncident(created);
+ created={groupId:group,eventId,incidentId:eventId,authorId:id,authorName:own.name,createdAt:Date.now(),sequence:1,kind:'START',title:$('incident-title').value.trim(),area:$('incident-area').value.trim(),training:$('incident-training').checked};if(await store.roster(group)){await store.commandQuake({groupId:group,eventId,actorDeviceId:id,operatedAt:created.createdAt,action:'REPORT',training:created.training,title:created.title,area:created.area});const states=quakeStates(await store.roster(group),await store.quakeEvents(group));created.eventId=states.find(s=>!s.closed&&s.formation.training===created.training)?.formation.incidentId||'';}else await store.mergeIncident(created);
  },async()=>{await store.update('meta','incident:'+group,()=>created.eventId);$('incident-form').hidden=true;await changed();},'地震発生・安否確認の開始');await refresh();});};
-$('incident-end').onclick=()=>{const scope=incidentScope();return task(async()=>{await saves.run('incident',()=>appendScopedIncident(store,scope,'END'),changed,'安否確認の終了');await refresh();});};
+$('incident-end').onclick=()=>{const scope=incidentScope();return task(async()=>{await saves.run('incident',async()=>{const r=await store.roster(scope.groupId);if(r){const state=quakeStates(r,await store.quakeEvents(scope.groupId)).find(s=>s.incidentIds.includes(scope.incidentId));if(!state)throw Error('開始中の災害を選んでください');await store.commandQuake({groupId:scope.groupId,eventId:crypto.randomUUID(),actorDeviceId:scope.authorId,operatedAt:Date.now(),action:'END',training:state.formation.training,targetId:scope.incidentId});}else await appendScopedIncident(store,scope,'END');},changed,'安否確認の終了');await refresh();});};
 $('connect').onsubmit=e=>{e.preventDefault();task(connect);};for(const b of document.querySelectorAll('[data-stop]'))b.onclick=()=>stop();$('role').onchange=renderFeedback;
 for(const phase of ['AB','BC'])$('phase-'+phase.toLowerCase()).onclick=()=>task(()=>{if(!link.requestPhase($('role').value,phase))return;try{socket.send(JSON.stringify({kind:'phase',phase}));}catch{stop('接続が終了しました。再接続して経路を確認してください。');}});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&socket)stop('画面を閉じたため停止');});

@@ -9,7 +9,7 @@ private fun validateIdentity(group: String, vararg ids: String) {
 }
 
 /** Phone measurements are independent of the registered home and of safety answers. */
-data class PhonePosition(
+@kotlinx.serialization.Serializable data class PhonePosition(
     val groupId: String, val originId: String, val revision: Long,
     val acquiredAt: Long, val latitude: Double, val longitude: Double, val accuracyMeters: Double,
 ) {
@@ -33,7 +33,7 @@ fun shouldReplacePosition(previous: PhonePosition?, next: PhonePosition): Boolea
 fun positionRequestInterval(disasterActive: Boolean): Long = if (disasterActive) 60_000L else 300_000L
 
 /** Editing a memo leaves the answer ID and its safety/rescue ordering unchanged. */
-data class SosMemo(
+@kotlinx.serialization.Serializable data class SosMemo(
     val groupId: String, val incidentId: String, val authorId: String, val answerId: String,
     val revision: Long, val updatedAt: Long, val text: String,
 ) {
@@ -42,4 +42,12 @@ data class SosMemo(
         require(revision in 1..MAX_RECORD_NUMBER && updatedAt in 0..MAX_RECORD_NUMBER)
         require(text.length <= SOS_MEMO_LIMIT) { "SOSメモは${SOS_MEMO_LIMIT}文字以内で入力してください" }
     }
+}
+
+fun shouldReplaceMemo(previous:SosMemo?,next:SosMemo):Boolean {
+    next.validate()
+    if(previous==null)return true
+    require(previous.groupId==next.groupId && previous.answerId==next.answerId && previous.incidentId==next.incidentId && previous.authorId==next.authorId) {"SOSメモの作成者・回答は変更できません"}
+    if(previous.revision==next.revision)require(previous==next) {"同じ更新番号に異なるSOSメモがあります"}
+    return next.revision>previous.revision
 }

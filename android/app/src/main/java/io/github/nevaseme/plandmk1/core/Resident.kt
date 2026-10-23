@@ -30,6 +30,14 @@ data class Resident(
 }
 
 interface RecordStore {
+    suspend fun quakeEvents(groupId:String):List<QuakeEvent> = emptyList()
+    suspend fun responseEvents(groupId:String):List<ResponseEvent> = emptyList()
+    suspend fun mergeQuake(event:QuakeEvent):Boolean = error("災害報告を保存できません")
+    suspend fun mergeResponse(event:ResponseEvent):Boolean = error("対応記録を保存できません")
+    suspend fun positions(groupId:String):List<PhonePosition> = emptyList()
+    suspend fun memos(groupId:String):List<SosMemo> = emptyList()
+    suspend fun savePosition(position:PhonePosition):Boolean = error("位置を保存できません")
+    suspend fun mergeMemo(memo:SosMemo):Boolean = error("SOSメモを保存できません")
     suspend fun places(groupId: String): List<PlaceEvent> = emptyList()
     suspend fun getPlace(groupId: String,eventId: String): PlaceEvent? = null
     suspend fun mergePlace(event: PlaceEvent): Boolean = error("建物記録を保存できません")

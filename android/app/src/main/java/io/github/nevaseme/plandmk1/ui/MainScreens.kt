@@ -55,7 +55,7 @@ import io.github.nevaseme.plandmk1.core.*
         val first = incident.current?.answers?.containsKey(model.localId) != true
         val memos by model.memos.collectAsStateWithLifecycle()
         val answer = incident.current?.answers?.get(model.localId)
-        val memo = memos.find { it.answerId == answer?.eventId && it.incidentId == incident.selection }?.text.orEmpty()
+        val memo = memos.find { it.answerId == answer?.eventId && it.incidentId == answer?.incidentId && it.authorId==model.localId }?.text.orEmpty()
         key(incident.groupId, incident.selection, model.localId) {
             AnswerPanel(first, when (own.safety) { Safety.SAFE -> MapSafety.SAFE; Safety.SOS -> MapSafety.SOS; else -> null }, memo, saving,
                 save = { state, text -> model.setSafety(if (state == MapSafety.SAFE) Safety.SAFE else Safety.SOS, text) },
@@ -93,7 +93,7 @@ import io.github.nevaseme.plandmk1.core.*
         residents.map { person ->
             val answer = incident.current?.answers?.get(person.originId)
             residentMapPerson(person, places, care, locations[person.originId],
-                if (answer?.safety == Safety.SOS) notes[answer.eventId]?.text.orEmpty() else "")
+                if (answer?.safety == Safety.SOS) notes[answer.eventId]?.takeIf {it.authorId==person.originId&&it.incidentId==answer.incidentId}?.text.orEmpty() else "")
         }
     }
     val homes = placeBuildings(places).map { MapHome(it.buildingId!!, it.displayLabel(), MapPoint(it.latitude!!, it.longitude!!)) }

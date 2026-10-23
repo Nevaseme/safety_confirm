@@ -22,7 +22,7 @@ class IncidentStorageTest {
             old.execSQL("CREATE TABLE care_events (groupId TEXT NOT NULL, eventId TEXT NOT NULL, subjectId TEXT NOT NULL, authorId TEXT NOT NULL, authorName TEXT NOT NULL, createdAt INTEGER NOT NULL, action TEXT NOT NULL, note TEXT NOT NULL, supersedes TEXT, PRIMARY KEY(groupId,eventId))")
             old.execSQL("INSERT INTO care_events VALUES ('test',?,?,?,'確認者',1,'RESCUED','旧記録',NULL)",arrayOf(oldCare,author,author));old.version=2
         }
-        fun open()=Room.databaseBuilder(context,PlanDatabase::class.java,name).addMigrations(PlanDatabase.MIGRATION_2_3, PlanDatabase.MIGRATION_3_4, PlanDatabase.MIGRATION_4_5).build()
+        fun open()=Room.databaseBuilder(context,PlanDatabase::class.java,name).addMigrations(PlanDatabase.MIGRATION_2_3, PlanDatabase.MIGRATION_3_4, PlanDatabase.MIGRATION_4_5, PlanDatabase.MIGRATION_5_6, PlanDatabase.MIGRATION_6_7).build()
         var db=open()
         try {
             var store=RoomRecordStore(db)

@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
 data class LabState(val active: Boolean = false, val peers: Set<String> = emptySet(), val phase: String? = null, val receipts: Int = 0, val error: String? = null, val connection: ConnectionStatus = ConnectionStatus())
 
 /** Foreground-only test transport. The same SyncEngine/Room are used as Nearby. */
-class LabController(private val store: RecordStore, private val localId: String) {
+class LabController(private val store: RecordStore, private val localId: String, private val allowOwnPosition:()->Boolean={true}) {
     private val mutable = MutableStateFlow(LabState())
     val state = mutable.asStateFlow()
     private val main = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -49,7 +49,7 @@ class LabController(private val store: RecordStore, private val localId: String)
             val sync = SyncEngine(group, localId, store, send = { peer, data ->
                 check(epoch == generation && socket?.send(JSONObject().put("kind", "data").put("to", peer).put("body", JSONObject(data.decodeToString())).toString()) == true) { "実験接続が終了しました" }
             }, onError = { if (epoch == generation) mutable.value = mutable.value.copy(error = it) },
-                onReceipt = { if (epoch == generation) mutable.value = mutable.value.copy(receipts = mutable.value.receipts + 1) })
+                onReceipt = { if (epoch == generation) mutable.value = mutable.value.copy(receipts = mutable.value.receipts + 1) }, allowOwnPosition=allowOwnPosition)
             engine = sync
             job = main.launch {
                 for (command in channel) {

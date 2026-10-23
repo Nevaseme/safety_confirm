@@ -8,7 +8,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import io.github.nevaseme.plandmk1.MainActivity
 import io.github.nevaseme.plandmk1.PlanDApplication
-import io.github.nevaseme.plandmk1.core.incidentOptions
+import io.github.nevaseme.plandmk1.core.managedIncidentOptions
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -37,7 +37,9 @@ class PositionService : Service() {
         val source = app.positionSourceFactory()
         val session = PositionRecording(scope, source, { fix ->
             check(app.position.current(requested) && app.installation.group.value == group)
-            app.store.recordOwnPosition(group, app.installation.localId, fix)
+            app.store.recordOwnPosition(group, app.installation.localId, fix).also {saved->
+                if(saved) {app.sharing.changed();app.lab.changed()}
+            }
         })
         recording = session
         if (!app.position.attach(token, session) { session.stop(); stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }) {
@@ -51,7 +53,7 @@ class PositionService : Service() {
         scope.launch { app.installation.group.filter { it != group }.first(); app.position.stop() }
         scope.launch {
             var previous: Set<String>? = null
-            app.store.observeIncidents(group).map { events -> incidentOptions(events).filter { !it.closed }.map { it.start.eventId }.toSet() }
+            combine(app.store.observeIncidents(group),app.quakes.observeRoster(group),app.quakes.observe(group)) {events,roster,quakes->managedIncidentOptions(events,roster,quakes).filter {!it.closed}.map {it.start.eventId}.toSet()}
                 .distinctUntilChanged().collect { active ->
                     session.disaster(active.isNotEmpty())
                     if(previous != null && active.any { it !in previous!! }) session.refresh()

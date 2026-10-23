@@ -20,19 +20,30 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
     val localId = app.installation.localId
     val group = app.installation.group
     val message = MutableStateFlow<String?>(null)
+    val roster=group.flatMapLatest {app.quakes.observeRoster(it)}.stateIn(viewModelScope,SharingStarted.Eagerly,null)
+    fun canEndIncident(startedBy:String)=roster.value?.members?.any {localId in it.deviceIds&&it.role==MemberRole.ADMIN} ?: (startedBy==localId)
+    fun importParticipants(json:String) {
+        viewModelScope.launch {
+            try {app.quakes.importRoster(json,localId);message.value="参加者設定を保存しました"}
+            catch(e:CancellationException){throw e}
+            catch(e:Exception){message.value=e.localizedMessage}
+        }
+    }
     val incidentUi = group.flatMapLatest { g ->
-        combine(app.store.observe(g),app.store.observeEvents(g),app.store.observeIncidents(g),app.installation.incidentSelectionChanges) { residents, care, journal, _ ->
-            val preferred=app.installation.incidentSelection(g)
-            val state=projectIncidentUi(g,residents,care,journal,preferred)
+        val authority=combine(app.quakes.observeRoster(g),app.quakes.observe(g)) {roster,events->roster to events}
+        combine(app.store.observe(g),app.store.observeEvents(g),app.store.observeIncidents(g),app.installation.incidentSelectionChanges,authority) { residents, care, journal, _, authorityState ->
+            val preferred=canonicalIncidentId(authorityState.first,authorityState.second,app.installation.incidentSelection(g))
+            val options=managedIncidentOptions(journal,authorityState.first,authorityState.second)
+            val state=projectIncidentUi(g,residents,care,journal,preferred,options)
             if(preferred==null&&state.selection.isNotEmpty()) {
                 try {app.installation.selectIncident(g,state.selection)}
-                catch(e: Exception) {message.value=e.localizedMessage;return@combine projectIncidentUi(g,residents,care,journal,"")}
+                catch(e: Exception) {message.value=e.localizedMessage;return@combine projectIncidentUi(g,residents,care,journal,"",options)}
             }
             state
         }
     }.stateIn(viewModelScope,SharingStarted.Eagerly,IncidentUiState())
     val residents = combine(group,incidentUi) { g,s -> if(g==s.groupId) s.residents else emptyList() }.stateIn(viewModelScope,SharingStarted.Eagerly,emptyList())
-    private val placeSource=group.flatMapLatest {g->app.store.observePlaces(g).map {g to it}}
+    private val placeSource=group.flatMapLatest {g->combine(app.store.observePlaces(g),app.quakes.observeRoster(g),app.quakes.observe(g)) {rows,roster,quakes->g to rows.map {it.copy(incidentId=canonicalIncidentId(roster,quakes,it.incidentId))}}}
     val places=combine(group,placeSource) {g,s->if(g==s.first)s.second else emptyList()}.stateIn(viewModelScope,SharingStarted.Eagerly,emptyList())
     private val positionSource = group.flatMapLatest { g -> app.store.observePositions(g).map { g to it } }
     val positions = combine(group, positionSource) { g, data -> if (g == data.first) data.second else emptyList() }
@@ -44,6 +55,29 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
     val position = app.position
     val lab = app.lab
     val careEvents = combine(group,incidentUi) { g,s -> if(g==s.groupId) s.care else emptyList() }.stateIn(viewModelScope,SharingStarted.Eagerly,emptyList())
+    val responseEvents=group.flatMapLatest {g->combine(app.responses.observe(g),app.quakes.observeRoster(g),app.quakes.observe(g)) {rows,roster,quakes->
+        if(roster==null)emptyList() else responseHeads(roster,rows.map {it.copy(incidentId=canonicalIncidentId(roster,quakes,it.incidentId))})
+    }}.stateIn(viewModelScope,SharingStarted.Eagerly,emptyList())
+    fun saveResponse(change:ResponseChange,replaces:List<String> = emptyList()) {
+        val g=group.value;val incident=if(change is ResponseChange.Availability)null else incidentUi.value.takeIf {it.groupId==g}?.current?.start?.eventId
+        viewModelScope.launch {
+            try {
+                val eventId=if(replaces.isEmpty())when(change){is ResponseChange.Report->change.reportId;is ResponseChange.Material->change.requestId;else->java.util.UUID.randomUUID().toString()}else java.util.UUID.randomUUID().toString()
+                app.responses.append(ResponseEvent(g,eventId,localId,1,System.currentTimeMillis(),incident,change,replaces))
+                sharing.changed();lab.changed();message.value="対応記録を保存しました"
+            }catch(e:CancellationException){throw e}catch(e:Exception){message.value=e.localizedMessage}
+        }
+    }
+    fun cancelEarthquakeReport(reportId:String) {
+        val g=group.value
+        viewModelScope.launch {
+            try {
+                val report=app.quakes.events(g).first {it.eventId==reportId&&it.action==QuakeAction.REPORT}
+                app.quakes.command(QuakeEvent(g,java.util.UUID.randomUUID().toString(),localId,System.currentTimeMillis(),QuakeAction.CANCEL,report.training,targetId=reportId))
+                sharing.changed();lab.changed();message.value="地震報告を取り消しました"
+            }catch(e:CancellationException){throw e}catch(e:Exception){message.value=e.localizedMessage}
+        }
+    }
     val maps = app.offlineMaps
     val saving = MutableStateFlow(false)
     private val saveOperations = SaveOperations(saving)
@@ -91,7 +125,7 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             saveOperations.complete("safety", "SOSメモ", persist = {
                 app.store.saveSosMemo(g, incident, localId, answerId, text, System.currentTimeMillis())
-            }, publish = {})
+            }, publish = { sharing.changed(); lab.changed() })
         }
     }
 
@@ -103,10 +137,16 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
     fun startIncident(title: String, area: String, training: Boolean) {
         if(!saveOperations.begin("incident"))return
         val g=group.value;val id=java.util.UUID.randomUUID().toString()
-        viewModelScope.launch { saveOperations.complete("incident","地震発生・安否確認の開始",persist={
+        var selected:String?=null
+        viewModelScope.launch { saveOperations.complete("incident","地震報告",persist={
             val own=checkNotNull(app.store.get(g,localId)) { "先に自分の情報を登録してください" }
-            app.store.mergeIncident(IncidentEvent(g,id,id,localId,own.name,1,System.currentTimeMillis(),IncidentKind.START,title.trim(),area.trim(),training))
-        },publish={ app.installation.selectIncident(g,id);saveOperations.clearOtherResults();sharing.changed();lab.changed() }) }
+            if(app.quakes.roster(g)!=null) {
+                val states=app.quakes.command(QuakeEvent(g,id,localId,System.currentTimeMillis(),QuakeAction.REPORT,training,title=title.trim(),area=area.trim()))
+                selected=states.lastOrNull {!it.closed&&it.formation.training==training}?.formation?.incidentId
+            }else{
+                app.store.mergeIncident(IncidentEvent(g,id,id,localId,own.name,1,System.currentTimeMillis(),IncidentKind.START,title.trim(),area.trim(),training));selected=id
+            }
+        },publish={ selected?.let {app.installation.selectIncident(g,it)};saveOperations.clearOtherResults();sharing.changed();lab.changed() }) }
     }
     fun endIncident() {
         if(!saveOperations.begin("incident"))return
@@ -114,7 +154,8 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { saveOperations.complete("incident","安否確認の終了",persist={
             val own=checkNotNull(app.store.get(g,localId))
             val selected=checkNotNull(current) { "開始中の災害を選んでください" }
-            app.store.appendIncident(IncidentEvent(g,java.util.UUID.randomUUID().toString(),selected.start.eventId,localId,own.name,1,System.currentTimeMillis(),IncidentKind.END))
+            if(app.quakes.roster(g)!=null)app.quakes.command(QuakeEvent(g,java.util.UUID.randomUUID().toString(),localId,System.currentTimeMillis(),QuakeAction.END,selected.start.training,targetId=selected.start.eventId))
+            else app.store.appendIncident(IncidentEvent(g,java.util.UUID.randomUUID().toString(),selected.start.eventId,localId,own.name,1,System.currentTimeMillis(),IncidentKind.END))
         },publish={ sharing.changed();lab.changed() }) }
     }
 

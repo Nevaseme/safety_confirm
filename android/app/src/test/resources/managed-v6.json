@@ -1,0 +1,175 @@
+{
+  "roster": {
+    "version": 1,
+    "groupId": "trial",
+    "members": [
+      {
+        "memberId": "00000000-0000-0000-0000-000000000001",
+        "activityName": "管理者",
+        "role": "ADMIN",
+        "deviceIds": [
+          "00000000-0000-0000-0000-000000000001"
+        ]
+      },
+      {
+        "memberId": "00000000-0000-0000-0000-000000000002",
+        "activityName": "確認班",
+        "role": "MEMBER",
+        "deviceIds": [
+          "00000000-0000-0000-0000-000000000002"
+        ]
+      }
+    ]
+  },
+  "quakes": [
+    {
+      "groupId": "trial",
+      "eventId": "00000000-0000-0000-0000-000000000011",
+      "actorDeviceId": "00000000-0000-0000-0000-000000000001",
+      "operatedAt": 1,
+      "action": "REPORT",
+      "training": false,
+      "targetId": null,
+      "reportIds": [],
+      "title": "地震",
+      "area": "地域",
+      "endedIncidentIds": []
+    },
+    {
+      "groupId": "trial",
+      "eventId": "00000000-0000-0000-0000-000000000012",
+      "actorDeviceId": "00000000-0000-0000-0000-000000000002",
+      "operatedAt": 2,
+      "action": "REPORT",
+      "training": false,
+      "targetId": null,
+      "reportIds": [],
+      "title": "地震",
+      "area": "地域",
+      "endedIncidentIds": []
+    },
+    {
+      "groupId": "trial",
+      "eventId": "00000000-0000-0000-0000-000000000013",
+      "actorDeviceId": "00000000-0000-0000-0000-000000000001",
+      "operatedAt": 2,
+      "action": "FORM",
+      "training": false,
+      "targetId": "00000000-0000-0000-0000-000000000011",
+      "reportIds": [
+        "00000000-0000-0000-0000-000000000011",
+        "00000000-0000-0000-0000-000000000012"
+      ],
+      "title": "",
+      "area": "",
+      "endedIncidentIds": []
+    }
+  ],
+  "responses": [
+    {
+      "groupId": "trial",
+      "eventId": "00000000-0000-0000-0000-000000000021",
+      "actorDeviceId": "00000000-0000-0000-0000-000000000001",
+      "sequence": 1,
+      "operatedAt": 10,
+      "incidentId": "00000000-0000-0000-0000-000000000011",
+      "change": {
+        "type": "REPORT",
+        "reportId": "00000000-0000-0000-0000-000000000021",
+        "category": "道路閉塞",
+        "latitude": 35.0,
+        "longitude": 139.0,
+        "description": "倒木"
+      },
+      "replaces": []
+    },
+    {
+      "groupId": "trial",
+      "eventId": "00000000-0000-0000-0000-000000000022",
+      "actorDeviceId": "00000000-0000-0000-0000-000000000001",
+      "sequence": 2,
+      "operatedAt": 11,
+      "incidentId": "00000000-0000-0000-0000-000000000011",
+      "change": {
+        "type": "ASSIGNMENT",
+        "target": {
+          "kind": "REPORT",
+          "id": "00000000-0000-0000-0000-000000000021"
+        },
+        "memberId": "00000000-0000-0000-0000-000000000002",
+        "active": true
+      },
+      "replaces": []
+    },
+    {
+      "groupId": "trial",
+      "eventId": "00000000-0000-0000-0000-000000000023",
+      "actorDeviceId": "00000000-0000-0000-0000-000000000001",
+      "sequence": 3,
+      "operatedAt": 12,
+      "incidentId": "00000000-0000-0000-0000-000000000011",
+      "change": {
+        "type": "PROGRESS",
+        "target": {
+          "kind": "REPORT",
+          "id": "00000000-0000-0000-0000-000000000021"
+        },
+        "status": "DONE",
+        "result": "歩行可能を確認"
+      },
+      "replaces": []
+    },
+    {
+      "groupId": "trial",
+      "eventId": "00000000-0000-0000-0000-000000000024",
+      "actorDeviceId": "00000000-0000-0000-0000-000000000001",
+      "sequence": 4,
+      "operatedAt": 13,
+      "incidentId": "00000000-0000-0000-0000-000000000011",
+      "change": {
+        "type": "PRIORITY",
+        "target": {
+          "kind": "REPORT",
+          "id": "00000000-0000-0000-0000-000000000021"
+        },
+        "urgency": "HIGH",
+        "reason": "唯一の通路"
+      },
+      "replaces": []
+    },
+    {
+      "groupId": "trial",
+      "eventId": "00000000-0000-0000-0000-000000000025",
+      "actorDeviceId": "00000000-0000-0000-0000-000000000001",
+      "sequence": 5,
+      "operatedAt": 14,
+      "incidentId": null,
+      "change": {
+        "type": "AVAILABILITY",
+        "state": "AVAILABLE"
+      },
+      "replaces": []
+    },
+    {
+      "groupId": "trial",
+      "eventId": "00000000-0000-0000-0000-000000000026",
+      "actorDeviceId": "00000000-0000-0000-0000-000000000001",
+      "sequence": 6,
+      "operatedAt": 15,
+      "incidentId": "00000000-0000-0000-0000-000000000011",
+      "change": {
+        "type": "MATERIAL",
+        "target": {
+          "kind": "REPORT",
+          "id": "00000000-0000-0000-0000-000000000021"
+        },
+        "requestId": "00000000-0000-0000-0000-000000000026",
+        "name": "のこぎり",
+        "unit": "本",
+        "needed": 2.0,
+        "arranged": 1.0
+      },
+      "replaces": []
+    }
+  ]
+}
