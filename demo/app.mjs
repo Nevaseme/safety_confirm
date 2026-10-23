@@ -13,11 +13,11 @@ const age=p=>p.acquiredAt?`${Math.round((NOW-p.acquiredAt)/60000)}分前`:'';
 const sensor=(name,large=false,enhanced=false)=>`<span class="${large?'obs-icon':'sensor'} ${name==='enclosed'?'enclosed':''}"><img src="assets/${name==='enclosed'?'enclosed.png':enhanced?'impact-collision.svg':'impact.svg'}" alt="${name==='enclosed'?'閉所':'衝撃'}"></span>`;
 const personById=id=>people.find(p=>p.id===id);
 const homeById=id=>homes.find(h=>h.id===id);
-const config={id:'near',zoom:query.get('view')==='wide'?14.2:16.8};
+const config={id:'near',zoom:query.get('view')==='wide'?14.2:16.8,version:'1.5.3 基本画面',summary:'地図と安否の2タブ。比較の基準となる画面です。'};
 
 function createFrame(config){
   const section=document.createElement('section');section.className='view';
-  section.innerHTML=`<h1 class="comparison-label">${config.enhanced?'新しい画面':'これまでの画面'}</h1><article class="phone ${config.enhanced?'enhanced':''}" id="${config.id}-screen">
+  section.innerHTML=`<header class="comparison-caption"><h1 class="comparison-label">${escape(config.version)}</h1><p class="comparison-summary">${escape(config.summary)}</p></header><article class="phone ${config.enhanced?'enhanced':''}" id="${config.id}-screen">
   <header class="top"><button class="plain menu" aria-label="メニュー">${icon('list')}</button>${config.enhanced?'<div class="incident-heading"><span class="title">地震発生</span><span class="incident-date">10月21日 14:32 ・ <span data-elapsed>28分前</span></span></div>':'<span class="title">地震発生</span><span class="date">10月21日</span>'}</header>
   <div class="tools"><label class="toggle-label">無事を表示<button class="switch" role="switch" aria-label="無事を表示" aria-checked="true"></button></label><button class="unknown">${icon('user')}位置不明 2人${icon('caret-right')}</button></div>
   <div class="map-area"><div class="map" id="${config.id}-map"></div><div class="loading">地図を読み込んでいます</div>
@@ -208,7 +208,38 @@ class ListMapFrame extends MapFrame{
     this.phone.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
   }
   showMap(){this.returnArea=null;this.closeSheet();this.setPage('map');this.map.resize();}
-  showSafety(){this.returnArea=null;this.setPage('safety');super.showSafety();}
+  showSafety(){
+    this.returnArea=null;this.setPage('safety');
+    if(!this.config.localSituation){super.showSafety();return;}
+    this.closeSheet();
+    const self=personById('p5'),page=this.phone.querySelector('.safety-page');
+    const previousAnswer=self.s==='rescued'?self.priorSafety:self.s;
+    let selected=previousAnswer==='sos'?'sos':'safe';
+    page.innerHTML=`<h2>自分の安否</h2><p>10月21日の地震</p><div class="choice-buttons"><button data-state="safe">${symbol('safe')}無事</button><button data-state="sos">${symbol('sos')}SOS</button></div><div class="memo-field"><label class="form-label" for="${this.config.id}-memo">SOSメモ</label><textarea id="${this.config.id}-memo" maxlength="500" aria-describedby="${this.config.id}-count" placeholder="今いる場所や、助けてほしいこと">${escape(self.memo)}</textarea><p class="memo-count" id="${this.config.id}-count"></p><button class="secondary full" data-save="memo">メモだけ保存する</button></div><button class="primary blue safety-submit" data-save="safety">安否を更新する</button>`;
+    const input=page.querySelector('textarea'),memoSave=page.querySelector('[data-save=memo]');
+    const update=()=>{
+      page.querySelector('.memo-count').textContent=`${input.value.length} / 500文字`;
+      memoSave.hidden=previousAnswer!=='sos';
+      memoSave.disabled=input.value===self.memo||input.value.length>500;
+      page.querySelector('[data-save=safety]').disabled=selected==='sos'&&input.value.length>500;
+    };
+    const choose=state=>{
+      selected=state;
+      page.querySelectorAll('[data-state]').forEach(b=>{b.classList.toggle('chosen',b.dataset.state===state);b.setAttribute('aria-pressed',String(b.dataset.state===state));});
+      page.querySelector('.memo-field').hidden=state!=='sos';update();
+    };
+    page.querySelectorAll('[data-state]').forEach(b=>b.onclick=()=>choose(b.dataset.state));
+    input.oninput=update;choose(selected);
+    memoSave.onclick=()=>{
+      if(memoSave.disabled)return;
+      self.memo=input.value;refreshAll();update();this.toast('メモを保存しました');
+    };
+    page.querySelector('[data-save=safety]').onclick=()=>{
+      if(selected==='sos'&&input.value.length>500)return;
+      self.s=selected;self.memo=selected==='sos'?input.value:'';self.answeredAt='15:00';
+      refreshAll();this.showMap();this.toast('安否を更新しました');
+    };
+  }
   showList(filter='all'){
     this.returnArea=null;this.closeSheet();this.listFilter=filter;this.setPage('people');this.refreshList();
     this.peoplePage.querySelector('h2').focus({preventScroll:true});
@@ -288,5 +319,7 @@ class ListMapFrame extends MapFrame{
   }
 }
 frames.push(new MapFrame(config,createFrame(config)));
-const newConfig={id:'new',zoom:config.zoom,enhanced:true};
+const newConfig={id:'new',zoom:config.zoom,enhanced:true,version:'一覧案 v1',summary:'一覧タブ、エリア内の一覧、地震発生からの経過時間を追加した画面案です。'};
 frames.push(new ListMapFrame(newConfig,createFrame(newConfig)));
+const latestConfig={id:'latest',zoom:config.zoom,enhanced:true,localSituation:true,version:'1.5.4 反映案',summary:'一覧案にSOSメモの500文字制限と「メモだけ保存」を追加。安否から操作できます。'};
+frames.push(new ListMapFrame(latestConfig,createFrame(latestConfig)));
