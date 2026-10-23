@@ -10,9 +10,9 @@ class SituationPresentationTest {
     private fun person(id: String, state: MapSafety = MapSafety.SOS, age: Long = 0) =
         MapPerson(id, "試験の名前", state, MapPoint(32.79, 130.819), now - age)
 
-    @Test fun lastPositionExpiresByAcquisitionRatherThanReception() {
+    @Test fun lastPositionRemainsVisibleWhenOldButMissingPositionIsUnknown() {
         assertTrue(person("a", age = 3 * DAY).hasPosition(now))
-        assertFalse(person("b", age = 3 * DAY + 1).hasPosition(now))
+        assertTrue(person("b", age = 3 * DAY + 1).hasPosition(now))
         assertFalse(person("c").copy(point = null).hasPosition(now))
     }
 
@@ -36,7 +36,7 @@ class SituationPresentationTest {
         assertEquals(1, mapClusters(people, 14.0, true, now).size)
         assertEquals(2, mapClusters(people, 16.0, true, now).size)
         assertEquals(listOf("a"), mapClusters(people, 14.0, false, now).flatMap { it.people }.map { it.id })
-        assertTrue(mapClusters(listOf(person("old", age = 4 * DAY)), 14.0, true, now).isEmpty())
+        assertEquals("old", mapClusters(listOf(person("old", age = 4 * DAY)), 14.0, true, now).single().people.single().id)
     }
 
     @Test fun unansweredMustAnswerBeforeMapButExistingAnswerSurvivesRecreation() {

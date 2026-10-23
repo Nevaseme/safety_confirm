@@ -1,6 +1,6 @@
 # PlanD：技術検討
 
-2026-10-20の調査を整理した参考資料。[設計書](2026-10-19-integrated-design.md)の実現方法と、後の段階で必要な調査を示す。今回の文書整理では外部資料の再調査や新機能の実機試験は行っていない。
+2026-10-20の技術調査を整理した参考資料。2026-10-23に工程を更新。追加調査は[外部資料と機能案の検討](2026-10-22-research-and-feature-options.md)を参照。[設計書](2026-10-19-integrated-design.md)の実現方法と残る検証を示す。
 
 ## 実現方法と残る検証
 
@@ -26,7 +26,8 @@
 - [Android：センサー概要](https://developer.android.com/develop/sensors-and-location/sensors/sensors_overview) — 背景取得の制限、センサーの有無・能力を確認する。
 - [MapLibre：FillLayer](https://maplibre.org/maplibre-native/android/api/-map-libre%20-native%20-android/org.maplibre.android.style.layers/-fill-layer/index.html) — 建物面の描画。
 - [MapLibre：queryRenderedFeatures](https://maplibre.org/maplibre-native/android/api/-map-libre%20-native%20-android/org.maplibre.android.maps/-map-libre-map/query-rendered-features.html) — 建物を選択するタップ判定。
-- [国土交通省：建物振動シミュレーション v3.0](https://www.mlit.go.jp/plateau/use-case/uc25-02/)／[先行事例](https://www.mlit.go.jp/plateau/use-case/uc23-24/) — 建築属性・地震動による推定の参考。PlanDの評価方法としての適合性は第4段階で検証する。
+- [国土交通省：建物振動シミュレーション v3.0](https://www.mlit.go.jp/plateau/use-case/uc25-02/)／[先行事例](https://www.mlit.go.jp/plateau/use-case/uc23-24/) — 建築属性・地震動による推定の参考。PlanDの評価方法としての適合性は第4段階に向けて検証する。
+- [Android：オフラインで使えるアプリの設計](https://developer.android.com/topic/architecture/data-layer/offline-first) — 保存データを画面の参照元とする。端末内の機能を先に完成させ、既存の同期を後から接続する構成の根拠。
 - [気象庁：緊急地震速報のデータ案内](https://www.data.jma.go.jp/developer/weatherdataguide/appendix/1-3-a.html) — リアルタイム配信の入手先・条件を調べる。発表履歴と即時配信を区別する。
 
 ## 着手時のコード確認点

@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.nevaseme.plandmk1.MapPoint
 import io.github.nevaseme.plandmk1.R
+import io.github.nevaseme.plandmk1.core.SOS_MEMO_LIMIT
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -40,7 +42,6 @@ fun StateSymbol(state: MapSafety, modifier: Modifier = Modifier, description: St
 
 fun positionDescription(person: MapPerson, now: Long): String = when {
     person.acquiredAt == null || person.point == null -> "位置は未受信"
-    !person.hasPosition(now) -> "3日以上更新なし"
     else -> "${SimpleDateFormat("HH:mm", Locale.JAPAN).format(Date(person.acquiredAt))}取得・${((now - person.acquiredAt) / 60_000).coerceAtLeast(0)}分前" + (person.accuracy?.let { "・精度 約${it}m" } ?: "")
 }
 
@@ -54,25 +55,36 @@ fun SituationScreen(
     history: @Composable (MapPerson) -> Unit = {},
     feedback: @Composable (MapPerson) -> Unit = {},
     openList: Boolean = false, onListClosed: () -> Unit = {},
+    listOnly: Boolean = false,
 ) {
     var showSafe by rememberSaveable { mutableStateOf(true) }
     var sheet by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var homeId by rememberSaveable { mutableStateOf<String?>(null) }
-    var overlapping by remember { mutableStateOf<List<MapPerson>>(emptyList()) }
+    var areaIds by rememberSaveable { mutableStateOf<List<String>?>(null) }
+    var listFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var extraHome by remember { mutableStateOf<MapHome?>(null) }
     var failed by remember { mutableStateOf(false) }
     val camera = remember { SituationCamera() }
     val unknown = people.filterNot { it.hasPosition(now) }
-    LaunchedEffect(openList) { if (openList) sheet = "all" }
+    LaunchedEffect(openList) { if (openList) { sheet = "all"; listFilter = null; areaIds = null } }
     val close = { sheet = null; onListClosed() }
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+    if (listOnly) {
+        val rows = situationList(people, listFilter?.takeUnless { it == "unknown" }?.let(MapSafety::valueOf), listFilter == "unknown", null, now)
+        LazyColumn(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
+            contentPadding = PaddingValues(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { Text("住民一覧 ${rows.size}人", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
+            item { SituationFilters(people, listFilter, now) { listFilter = it } }
+            items(rows, key = { it.id }) { person -> PersonRow(person, now, false) { selectedId = person.id; sheet = "person" } }
+            if (rows.isEmpty()) item { Text("該当する人はいません", Modifier.padding(vertical = 20.dp)) }
+        }
+    } else Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 62.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("無事を表示", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Spacer(Modifier.width(6.dp))
             Switch(showSafe, { showSafe = it }, Modifier.semantics { contentDescription = "無事を表示" })
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = { sheet = "unknown" }, contentPadding = PaddingValues(horizontal = 4.dp)) {
+            TextButton(onClick = { sheet = "unknown"; listFilter = null; areaIds = null }, contentPadding = PaddingValues(horizontal = 4.dp)) {
                 PlanIcon("person", null)
                 Spacer(Modifier.width(4.dp)); Text("位置不明 ${unknown.size}人", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 Text(" ›", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -82,7 +94,7 @@ fun SituationScreen(
             SituationMap(people, homes, center, showSafe, now, preview, camera,
                 onPerson = { selectedId = it.id; sheet = "person" },
                 onHome = { extraHome = it; homeId = it.id; sheet = "home" },
-                onOverlapping = { overlapping = it; sheet = "overlap" }, onError = { failed = true }, modifier = Modifier.fillMaxSize())
+                onOverlapping = { areaIds = it.map(MapPerson::id); listFilter = null; sheet = "overlap" }, onError = { failed = true }, modifier = Modifier.fillMaxSize())
             Surface(Modifier.align(Alignment.TopEnd).padding(12.dp), shape = RoundedCornerShape(14.dp), shadowElevation = 3.dp, color = Color.White) {
                 Column {
                     IconButton(onClick = { camera.zoom(1.0) }) { Text("+", fontSize = 26.sp, color = Color(0xFF183447), modifier = Modifier.semantics { contentDescription = "地図を拡大" }) }
@@ -138,9 +150,11 @@ fun SituationScreen(
                     Spacer(Modifier.height(20.dp))
                 }
                 else -> {
-                    val rows = when (sheet) { "unknown" -> unknown; "overlap" -> overlapping; else -> people }
+                    val base = situationList(people, null, sheet == "unknown", if (sheet == "overlap") areaIds?.toSet() else null, now)
+                    val rows = situationList(base, listFilter?.takeUnless { it == "unknown" }?.let(MapSafety::valueOf), listFilter == "unknown", null, now)
                     LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(.8f), contentPadding = PaddingValues(horizontal = 22.dp, vertical = 8.dp)) {
-                        item { DetailHeading(if (sheet == "unknown") "位置不明 ${rows.size}人" else "住民一覧 ${rows.size}人", null, close) }
+                        item { DetailHeading(when (sheet) { "unknown" -> "位置不明 ${rows.size}人"; "overlap" -> "このエリアの${rows.size}人"; else -> "住民一覧 ${rows.size}人" }, null, close) }
+                        if (sheet != "unknown") item { SituationFilters(base, listFilter, now) { listFilter = it } }
                         items(rows, key = { it.id }) { person -> PersonRow(person, now, sheet == "unknown") { selectedId = person.id; sheet = "person" } }
                         if (rows.isEmpty()) item { Text("該当する人はいません", Modifier.padding(vertical = 20.dp)) }
                     }
@@ -148,6 +162,15 @@ fun SituationScreen(
             }
         }
         }
+    }
+}
+
+@Composable private fun SituationFilters(people: List<MapPerson>, selected: String?, now: Long, onSelect: (String?) -> Unit) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(selected = selected == null, onClick = { onSelect(null) }, label = { Text("全員 ${people.size}") })
+        MapSafety.entries.forEach { state -> FilterChip(selected = selected == state.name,
+            onClick = { onSelect(state.name) }, label = { Text("${state.label} ${people.count { it.state == state }}") }) }
+        FilterChip(selected = selected == "unknown", onClick = { onSelect("unknown") }, label = { Text("位置不明 ${people.count { !it.hasPosition(now) }}") })
     }
 }
 
@@ -231,7 +254,7 @@ fun SituationScreen(
 }
 
 @Composable
-fun AnswerPanel(first: Boolean, initial: MapSafety?, initialMemo: String, saving: Boolean, allowMemo: Boolean = true, save: (MapSafety, String) -> Unit, feedback: @Composable () -> Unit = {}) {
+fun AnswerPanel(first: Boolean, initial: MapSafety?, initialMemo: String, saving: Boolean, allowMemo: Boolean = true, save: (MapSafety, String) -> Unit, saveMemo: ((String) -> Unit)? = null, feedback: @Composable () -> Unit = {}) {
     var selected by rememberSaveable(initial) { mutableStateOf(initial?.name) }
     var memo by rememberSaveable(initialMemo) { mutableStateOf(initialMemo) }
     Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -247,7 +270,12 @@ fun AnswerPanel(first: Boolean, initial: MapSafety?, initialMemo: String, saving
                 }
             }
         }
-        if (allowMemo && selected == MapSafety.SOS.name) OutlinedTextField(memo, { memo = it.take(500) }, label = { Text("SOSメモ") }, placeholder = { Text("今いる場所や、助けてほしいこと") }, minLines = 3, enabled = !saving, modifier = Modifier.fillMaxWidth())
+        if (allowMemo && selected == MapSafety.SOS.name) OutlinedTextField(memo, { memo = it.take(SOS_MEMO_LIMIT) }, label = { Text("SOSメモ") }, supportingText = { Text("${memo.length} / $SOS_MEMO_LIMIT") }, placeholder = { Text("今いる場所や、助けてほしいこと") }, minLines = 3, enabled = !saving, modifier = Modifier.fillMaxWidth())
+        if (saveMemo != null && initial == MapSafety.SOS && selected == MapSafety.SOS.name) {
+            OutlinedButton(onClick = { saveMemo(memo) }, enabled = !saving && memo != initialMemo, modifier = Modifier.fillMaxWidth()) {
+                Text("メモだけ保存する")
+            }
+        }
         Button(onClick = { selected?.let { save(MapSafety.valueOf(it), memo) } }, enabled = selected != null && !saving,
             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(14.dp)) {
             if (saving) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(10.dp)) }

@@ -34,7 +34,14 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
     val residents = combine(group,incidentUi) { g,s -> if(g==s.groupId) s.residents else emptyList() }.stateIn(viewModelScope,SharingStarted.Eagerly,emptyList())
     private val placeSource=group.flatMapLatest {g->app.store.observePlaces(g).map {g to it}}
     val places=combine(group,placeSource) {g,s->if(g==s.first)s.second else emptyList()}.stateIn(viewModelScope,SharingStarted.Eagerly,emptyList())
+    private val positionSource = group.flatMapLatest { g -> app.store.observePositions(g).map { g to it } }
+    val positions = combine(group, positionSource) { g, data -> if (g == data.first) data.second else emptyList() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    private val memoSource = group.flatMapLatest { g -> app.store.observeMemos(g).map { g to it } }
+    val memos = combine(group, memoSource) { g, data -> if (g == data.first) data.second else emptyList() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val sharing = app.sharing
+    val position = app.position
     val lab = app.lab
     val careEvents = combine(group,incidentUi) { g,s -> if(g==s.groupId) s.care else emptyList() }.stateIn(viewModelScope,SharingStarted.Eagerly,emptyList())
     val maps = app.offlineMaps
@@ -56,7 +63,7 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
                 val candidate = Resident(g, localId, 1, 0, name.trim(), lat.toDoubleOrNull() ?: error("緯度を数値で入力してください"),
                     lon.toDoubleOrNull() ?: error("経度を数値で入力してください"), floor.trim(), room.trim())
                 candidate.validate()
-                if (changingGroup) { sharing.stop(); lab.stop(text = "グループを変更したため停止しました") }
+                if (changingGroup) { position.stop(); sharing.stop(); lab.stop(text = "グループを変更したため停止しました") }
                 app.store.updateOwn(g, localId) { previous -> candidate.copy(safety = previous?.safety ?: Safety.UNREPORTED) }
             }, publish = {
                 if (changingGroup) { app.installation.setGroup(g); saveOperations.clearOtherResults() }
@@ -66,14 +73,25 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun setSafety(safety: Safety) {
+    fun setSafety(safety: Safety, memo: String = "") {
         if (!saveOperations.begin("safety")) return
         val targetGroup=group.value;val incident=incidentUi.value.takeIf { it.groupId==targetGroup }?.selection.orEmpty()
         viewModelScope.launch {
             saveOperations.complete("safety", if (safety == Safety.SOS) "SOS" else "無事", persist = {
                 val own=checkNotNull(app.store.get(targetGroup,localId)) { "先に設定で自分の情報を登録してください" }
-                app.store.appendIncident(IncidentEvent(targetGroup,java.util.UUID.randomUUID().toString(),incident,localId,own.name,1,System.currentTimeMillis(),IncidentKind.ANSWER,safety=safety))
-            }, publish = { sharing.changed(); lab.changed() })
+                app.store.answerWithMemo(IncidentEvent(targetGroup,java.util.UUID.randomUUID().toString(),incident,localId,own.name,1,System.currentTimeMillis(),IncidentKind.ANSWER,safety=safety), if (safety == Safety.SOS) memo else "")
+            }, publish = { position.refresh(); sharing.changed(); lab.changed() })
+        }
+    }
+
+    fun saveSosMemo(answerId: String, text: String) {
+        if (!saveOperations.begin("safety")) return
+        val g = group.value
+        val incident = incidentUi.value.takeIf { it.groupId == g }?.selection.orEmpty()
+        viewModelScope.launch {
+            saveOperations.complete("safety", "SOSメモ", persist = {
+                app.store.saveSosMemo(g, incident, localId, answerId, text, System.currentTimeMillis())
+            }, publish = {})
         }
     }
 

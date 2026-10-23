@@ -132,11 +132,11 @@ fun PlanApp(model: PlanViewModel) {
         message?.let { snackbar.showSnackbar(it); if (model.message.value == it) model.message.value = null }
     }
     fun navigate(destination: Int) {
-        if (tab in 0..1 && !picking) lastMain = tab
+        if (tab in listOf(0, 1, 8) && !picking) lastMain = tab
         tab = destination; picking = false
         scope.launch { drawer.close() }
     }
-    BackHandler(enabled = picking || tab !in 0..1) {
+    BackHandler(enabled = picking || tab !in listOf(0, 1, 8)) {
         if (picking) { picking = false; tab = 3 } else tab = lastMain
     }
     ModalNavigationDrawer(drawerState = drawer, gesturesEnabled = drawer.isOpen, drawerContent = {
@@ -149,10 +149,10 @@ fun PlanApp(model: PlanViewModel) {
                 NamedEntity("自分の名前", own?.displayName() ?: "未登録")
                 Text("グループ：$group", style = MaterialTheme.typography.bodySmall)
                 HorizontalDivider(Modifier.padding(vertical = 12.dp))
-                listOf(3 to "自分の情報", 2 to "自分の建物・住戸", 4 to "共有・接続", 5 to "オフライン地図", 6 to "災害・訓練の管理", 7 to "アプリ情報").forEach { (destination, label) ->
+                listOf(3 to "自分の情報", 2 to "自分の建物・住戸", 9 to "位置記録", 4 to "共有・接続", 5 to "オフライン地図", 6 to "災害・訓練の管理", 7 to "アプリ情報").forEach { (destination, label) ->
                     NavigationDrawerItem(label = { Text(label) }, selected = tab == destination, onClick = { navigate(destination) })
                 }
-                if (incident.canEdit && !firstAnswer) NavigationDrawerItem(label = { Text("住民一覧") }, selected = false, onClick = { tab = 1; showPeople = true; scope.launch { drawer.close() } })
+                if (incident.canEdit && !firstAnswer) NavigationDrawerItem(label = { Text("住民一覧") }, selected = false, onClick = { tab = 8; scope.launch { drawer.close() } })
                 if (BuildConfig.DEBUG) NavigationDrawerItem(label = { Text("画面デモ") }, selected = false, onClick = { scope.launch { drawer.close(); preview = true } })
             }
         }
@@ -160,16 +160,17 @@ fun PlanApp(model: PlanViewModel) {
         Scaffold(
             topBar = { TopAppBar(
                 title = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(when { picking -> "住居の位置を選択"; tab in 0..1 -> if (incident.canEdit) if (incident.current?.start?.training == true) "訓練" else "地震発生" else "PlanD"; else -> when(tab) {2->"自分の建物・住戸";3->"自分の情報";4->"共有・接続";5->"オフライン地図";6->"災害・訓練の管理";else->"アプリ情報"}}, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-                    if (tab in 0..1 && !picking && incident.canEdit) Text(java.text.SimpleDateFormat("M月d日", java.util.Locale.JAPAN).format(Date(incident.current!!.start.createdAt)), style = MaterialTheme.typography.labelLarge)
+                    Text(when { picking -> "住居の位置を選択"; tab in listOf(0, 1, 8) -> if (incident.canEdit) if (incident.current?.start?.training == true) "訓練" else "地震発生" else "PlanD"; else -> when(tab) {2->"自分の建物・住戸";3->"自分の情報";4->"共有・接続";5->"オフライン地図";6->"災害・訓練の管理";9->"位置記録";else->"アプリ情報"}}, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+                    if (tab in listOf(0, 1, 8) && !picking && incident.canEdit) Text(java.text.SimpleDateFormat("M月d日", java.util.Locale.JAPAN).format(Date(incident.current!!.start.createdAt)), style = MaterialTheme.typography.labelLarge)
                 } },
                 navigationIcon = {
-                    if (picking || tab !in 0..1) IconButton(onClick = { if(picking){picking=false;tab=3}else tab=lastMain }) { PlanIcon("back", "戻る") }
+                    if (picking || tab !in listOf(0, 1, 8)) IconButton(onClick = { if(picking){picking=false;tab=3}else tab=lastMain }) { PlanIcon("back", "戻る") }
                     else IconButton(onClick = { scope.launch { drawer.open() } }) { PlanIcon("menu", "メニューを開く") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)) },
-            bottomBar = { if(tab in 0..1 && !picking && incident.canEdit && !firstAnswer) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+            bottomBar = { if(tab in listOf(0, 1, 8) && !picking && incident.canEdit && !firstAnswer) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                 NavigationBarItem(selected=tab==1,onClick={tab=1;lastMain=1},colors=planNavigationColors(),icon={PlanIcon("map",null)},label={Text("地図")})
+                NavigationBarItem(selected=tab==8,onClick={tab=8;lastMain=8},colors=planNavigationColors(),icon={PlanIcon("list",null)},label={Text("一覧")})
                 NavigationBarItem(selected=tab==0,onClick={tab=0;lastMain=0},colors=planNavigationColors(),icon={PlanIcon("person",null)},label={Text("安否")})
             } },
             snackbarHost = { SnackbarHost(snackbar) },
@@ -177,15 +178,16 @@ fun PlanApp(model: PlanViewModel) {
             Column(Modifier.fillMaxSize().padding(padding)) {
                 screenState.SaveableStateProvider(tab) {
                     when {
-                        tab in 0..1 && !picking && firstAnswer -> SafetyScreen(model, own, saving, onProfile={navigate(3)}, onIncident={navigate(6)})
-                        tab in 0..1 && !picking && !incident.canEdit -> PeaceHome(model, own != null, onProfile={navigate(3)}, onIncident={navigate(6)}, onPreview={preview=true})
+                        tab in listOf(0, 1, 8) && !picking && firstAnswer -> SafetyScreen(model, own, saving, onProfile={navigate(3)}, onIncident={navigate(6)})
+                        tab in listOf(0, 1, 8) && !picking && !incident.canEdit -> PeaceHome(model, own != null, onProfile={navigate(3)}, onIncident={navigate(6)}, onPreview={preview=true})
                         else -> when(tab) {
                         0 -> SafetyScreen(model, own, saving, onProfile={navigate(3)}, onIncident={navigate(6)})
-                        1 -> MapScreen(model, residents, own, picking,
+                        1, 8 -> MapScreen(model, residents, own, picking,
                             onPick={model.pickedPoint.value=it;picking=false;tab=3},
-                            onCancelPick={picking=false;tab=3},onSelect={detailId=it.originId},onBuilding={buildingId=it},openList=showPeople,onListClosed={showPeople=false})
+                            onCancelPick={picking=false;tab=3},onSelect={detailId=it.originId},onBuilding={buildingId=it},openList=showPeople,onListClosed={showPeople=false},listOnly=tab==8)
                         2 -> BuildingsScreen(model, onProfile={navigate(3)}) {buildingId=it}
                         3 -> SettingsScreen(model, own, group, saving, onBuildings={navigate(2)}, onPick={picking=true;tab=1})
+                        9 -> PositionSettings(model, own != null)
                         4 -> LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                         item { SectionTitle("近くの端末と共有") }
                         item { StatusFeedback(when {

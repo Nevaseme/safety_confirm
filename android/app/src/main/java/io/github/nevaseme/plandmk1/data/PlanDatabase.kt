@@ -76,13 +76,20 @@ data class PlaceRow(val groupId: String,val eventId: String,val payload: String)
     @Insert(onConflict=OnConflictStrategy.ABORT) suspend fun put(row: PlaceRow)
 }
 
-@Database(entities = [ResidentRow::class, CareEventRow::class, IncidentRow::class, PlaceRow::class], version = 4, exportSchema = true)
+@Database(entities = [ResidentRow::class, CareEventRow::class, IncidentRow::class, PlaceRow::class, PhonePositionRow::class, SosMemoRow::class], version = 5, exportSchema = true)
 abstract class PlanDatabase : RoomDatabase() {
+    abstract fun localSituation(): LocalSituationDao
     abstract fun places(): PlaceDao
     abstract fun incidents(): IncidentDao
     abstract fun residents(): ResidentDao
     abstract fun careEvents(): CareEventDao
     companion object {
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS `phone_positions` (`groupId` TEXT NOT NULL, `originId` TEXT NOT NULL, `revision` INTEGER NOT NULL, `acquiredAt` INTEGER NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `accuracyMeters` REAL NOT NULL, PRIMARY KEY(`groupId`, `originId`))")
+                db.execSQL("CREATE TABLE IF NOT EXISTS `sos_memos` (`groupId` TEXT NOT NULL, `incidentId` TEXT NOT NULL, `authorId` TEXT NOT NULL, `answerId` TEXT NOT NULL, `revision` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `text` TEXT NOT NULL, PRIMARY KEY(`groupId`, `answerId`))")
+            }
+        }
         val MIGRATION_3_4=object: Migration(3,4) {
             override fun migrate(db: SupportSQLiteDatabase) {db.execSQL("CREATE TABLE IF NOT EXISTS `place_events` (`groupId` TEXT NOT NULL, `eventId` TEXT NOT NULL, `payload` TEXT NOT NULL, PRIMARY KEY(`groupId`, `eventId`))")}
         }
@@ -100,6 +107,46 @@ abstract class PlanDatabase : RoomDatabase() {
 }
 
 class RoomRecordStore(private val db: PlanDatabase) : RecordStore {
+    suspend fun recordOwnPosition(group: String, origin: String, fix: io.github.nevaseme.plandmk1.location.PositionFix): Boolean = db.withTransaction {
+        checkNotNull(get(group, origin)) { "先に自分の情報を登録してください" }
+        val previous = db.localSituation().position(group, origin)?.value
+        if (previous != null && fix.acquiredAt <= previous.acquiredAt) return@withTransaction false
+        val next = PhonePosition(group, origin, Math.addExact(previous?.revision ?: 0, 1), fix.acquiredAt, fix.latitude, fix.longitude, fix.accuracy)
+        next.validate()
+        db.localSituation().putPosition(PhonePositionRow(next))
+        true
+    }
+    fun observePositions(group: String) = db.localSituation().observePositions(group).map { rows -> rows.map { it.value } }
+    suspend fun positions(group: String) = db.localSituation().positions(group).map { it.value }
+    suspend fun savePosition(position: PhonePosition): Boolean = db.withTransaction {
+        if (!shouldReplacePosition(db.localSituation().position(position.groupId, position.originId)?.value, position)) false
+        else { db.localSituation().putPosition(PhonePositionRow(position)); true }
+    }
+    fun observeMemos(group: String) = db.localSituation().observeMemos(group).map { rows -> rows.map { it.value } }
+    suspend fun memos(group: String) = db.localSituation().memos(group).map { it.value }
+
+    suspend fun saveSosMemo(group: String, incident: String, author: String, answerId: String, text: String, at: Long): SosMemo = db.withTransaction {
+        val view = incidentView(incidents(group), incident)
+        require(view != null && !view.closed) { "開始中の災害を選んでください" }
+        val answer = view.answers[author]
+        require(answer?.eventId == answerId && answer.safety == Safety.SOS) { "最新のSOSのメモだけ編集できます" }
+        val previous = db.localSituation().memo(group, answerId)?.value
+        SosMemo(group, incident, author, answerId, Math.addExact(previous?.revision ?: 0, 1), at, text).also {
+            it.validate()
+            db.localSituation().putMemo(SosMemoRow(it))
+        }
+    }
+
+    suspend fun answerWithMemo(event: IncidentEvent, memo: String): IncidentEvent = db.withTransaction {
+        require(event.kind == IncidentKind.ANSWER)
+        require(memo.length <= SOS_MEMO_LIMIT) { "SOSメモは${SOS_MEMO_LIMIT}文字以内で入力してください" }
+        require(event.safety == Safety.SOS || memo.isEmpty())
+        require(get(event.groupId, event.authorId) != null) { "先に自分の情報を登録してください" }
+        appendIncident(event).also { answer ->
+            if (answer.safety == Safety.SOS) saveSosMemo(answer.groupId, answer.incidentId, answer.authorId, answer.eventId, memo, answer.createdAt)
+        }
+    }
+
     fun observePlaces(groupId: String)=db.places().observe(groupId).map {it.map(PlaceRow::record)}
     override suspend fun places(groupId: String)=db.places().all(groupId).map(PlaceRow::record)
     override suspend fun getPlace(groupId: String,eventId: String)=db.places().get(groupId,eventId)?.record()

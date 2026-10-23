@@ -32,6 +32,7 @@ import io.github.nevaseme.plandmk1.core.*
                 line(9f,3f,9f,18f);line(15f,6f,15f,21f)
             }
             "target" -> { drawCircle(ink,7*s,Offset(12*s,12*s),style=Stroke(stroke));line(12f,1f,12f,6f);line(12f,18f,12f,23f);line(1f,12f,6f,12f);line(18f,12f,23f,12f) }
+            "list" -> { listOf(5f, 12f, 19f).forEach { y -> drawCircle(ink, 1.5f*s, Offset(3*s, y*s)); line(8f,y,22f,y) } }
             else -> { drawCircle(ink,4*s,Offset(12*s,7*s));drawPath(Path().apply {moveTo(3*s,23*s);cubicTo(3*s,10*s,21*s,10*s,21*s,23*s);close()},ink) }
         }
     }
@@ -52,9 +53,15 @@ import io.github.nevaseme.plandmk1.core.*
         }
     } else {
         val first = incident.current?.answers?.containsKey(model.localId) != true
-        AnswerPanel(first, when (own.safety) { Safety.SAFE -> MapSafety.SAFE; Safety.SOS -> MapSafety.SOS; else -> null }, "", saving, allowMemo = false,
-            save = { state, _ -> model.setSafety(if (state == MapSafety.SAFE) Safety.SAFE else Safety.SOS) },
-            feedback = { OperationFeedback(model, "safety") })
+        val memos by model.memos.collectAsStateWithLifecycle()
+        val answer = incident.current?.answers?.get(model.localId)
+        val memo = memos.find { it.answerId == answer?.eventId && it.incidentId == incident.selection }?.text.orEmpty()
+        key(incident.groupId, incident.selection, model.localId) {
+            AnswerPanel(first, when (own.safety) { Safety.SAFE -> MapSafety.SAFE; Safety.SOS -> MapSafety.SOS; else -> null }, memo, saving,
+                save = { state, text -> model.setSafety(if (state == MapSafety.SAFE) Safety.SAFE else Safety.SOS, text) },
+                saveMemo = answer?.takeIf { it.safety == Safety.SOS }?.let { current -> { text -> model.saveSosMemo(current.eventId, text) } },
+                feedback = { OperationFeedback(model, "safety") })
+        }
     }
 }
 
@@ -71,16 +78,28 @@ import io.github.nevaseme.plandmk1.core.*
     }
 }
 
-@Composable fun MapScreen(model: PlanViewModel, residents: List<Resident>, own: Resident?, picking: Boolean, onPick: (MapPoint) -> Unit, onCancelPick: () -> Unit, onSelect: (Resident) -> Unit, onBuilding: (String) -> Unit, openList: Boolean = false, onListClosed: () -> Unit = {}) {
+@Composable fun MapScreen(model: PlanViewModel, residents: List<Resident>, own: Resident?, picking: Boolean, onPick: (MapPoint) -> Unit, onCancelPick: () -> Unit, onSelect: (Resident) -> Unit, onBuilding: (String) -> Unit, openList: Boolean = false, onListClosed: () -> Unit = {}, listOnly: Boolean = false) {
     val care by model.careEvents.collectAsStateWithLifecycle()
     val places by model.places.collectAsStateWithLifecycle()
     val incident by model.incidentUi.collectAsStateWithLifecycle()
     val saving by model.saving.collectAsStateWithLifecycle()
+    val positions by model.positions.collectAsStateWithLifecycle()
+    val memos by model.memos.collectAsStateWithLifecycle()
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(60_000); now = System.currentTimeMillis() } }
-    val people = remember(residents, places, care) { residents.map { residentMapPerson(it, places, care) } }
+    val people = remember(residents, places, care, positions, memos, incident) {
+        val locations = positions.associateBy { it.originId }
+        val notes = memos.associateBy { it.answerId }
+        residents.map { person ->
+            val answer = incident.current?.answers?.get(person.originId)
+            residentMapPerson(person, places, care, locations[person.originId],
+                if (answer?.safety == Safety.SOS) notes[answer.eventId]?.text.orEmpty() else "")
+        }
+    }
     val homes = placeBuildings(places).map { MapHome(it.buildingId!!, it.displayLabel(), MapPoint(it.latitude!!, it.longitude!!)) }
-    val center = own?.let { MapPoint(it.latitude, it.longitude) } ?: MapPoint(32.7904, 130.819)
+    val center = if (picking) own?.let { MapPoint(it.latitude, it.longitude) } ?: MapPoint(32.7904, 130.819)
+        else positions.find { it.originId == model.localId }?.let { MapPoint(it.latitude, it.longitude) }
+            ?: own?.let { MapPoint(it.latitude, it.longitude) } ?: MapPoint(32.7904, 130.819)
     if (picking) Box(Modifier.fillMaxSize()) {
         ResidentMap(emptyList(), center, true, onPick, onSelect, {}, Modifier.fillMaxSize())
         Surface(Modifier.align(Alignment.TopCenter).padding(12.dp), shape = MaterialTheme.shapes.medium) { Text("住居の位置をタップ", Modifier.padding(12.dp)) }
@@ -91,7 +110,7 @@ import io.github.nevaseme.plandmk1.core.*
         onUndo = { p -> currentCareEvents(care.filter { it.subjectId == p.id }).find { it.action == CareAction.RESCUED && it.authorId == model.localId }?.let { model.saveCare(p.id, CareAction.REVOKED, "救助完了の記録を訂正", it.eventId) } },
         history = { p -> residents.find { it.originId == p.id }?.let { CareHistoryAndEditor(model, it, care, own != null && incident.canEdit, saving) } },
         feedback = { p -> OperationFeedback(model, model.careSaveKey(p.id)) },
-        openList = openList, onListClosed = onListClosed)
+        openList = openList, onListClosed = onListClosed, listOnly = listOnly)
 }
 
 @Composable fun AppInformation() {

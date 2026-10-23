@@ -31,8 +31,12 @@ data class MapPerson(
         MapSafety.RESCUED -> "救助済みの人"
         else -> name.ifBlank { "登録住民" }
     }
-    fun hasPosition(now: Long) = point != null && acquiredAt != null && now - acquiredAt <= 3 * DAY
+    fun hasPosition(@Suppress("UNUSED_PARAMETER") now: Long) = point != null && acquiredAt != null
 }
+
+fun situationList(people: List<MapPerson>, state: MapSafety?, unknownOnly: Boolean, areaIds: Set<String>?, now: Long) =
+    people.filter { (state == null || it.state == state) && (!unknownOnly || !it.hasPosition(now)) &&
+        (areaIds == null || it.id in areaIds) }
 
 enum class MainDestination { HOME, ANSWER, MAP }
 fun mainDestination(active: Boolean, answered: Boolean) = when {
@@ -142,10 +146,13 @@ fun publicRecordAuthor(authorId: String, people: List<Resident>, care: List<Care
     } ?: "メンバー"
 
 // The old schema stores home coordinates, not measured phone positions.
-fun residentMapPerson(person: Resident, places: List<PlaceEvent>, care: List<CareEvent>): MapPerson {
+fun residentMapPerson(person: Resident, places: List<PlaceEvent>, care: List<CareEvent>, position: PhonePosition? = null, memo: String = ""): MapPerson {
     val building = validHome(places, person.originId)?.buildingId?.let { id -> placeBuildings(places).find { it.buildingId == id } }
     val home = building?.let { MapHome(it.buildingId!!, it.displayLabel(), MapPoint(it.latitude!!, it.longitude!!)) }
         ?: MapHome("home:${person.originId}", "登録住居", MapPoint(person.latitude, person.longitude))
-    return MapPerson(person.originId, person.displayName(), residentMapState(person, care), home = home,
+    val measured = position?.takeIf { it.groupId == person.groupId && it.originId == person.originId }
+    return MapPerson(person.originId, person.displayName(), residentMapState(person, care),
+        point = measured?.let { MapPoint(it.latitude, it.longitude) }, acquiredAt = measured?.acquiredAt,
+        accuracy = measured?.accuracyMeters?.let { ceil(it).toInt() }, memo = memo, home = home,
         bedroom = listOf(person.floor, person.room).filter { it.isNotBlank() }.joinToString("・").ifBlank { "未登録" })
 }

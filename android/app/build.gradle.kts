@@ -15,8 +15,8 @@ android {
         applicationId = "io.github.nevaseme.plandmk1"
         minSdk = 24
         targetSdk = 37
-        versionCode = 16
-        versionName = "1.5.3"
+        versionCode = 18
+        versionName = "1.5.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -37,6 +37,7 @@ android {
         compose = true
         buildConfig = true
     }
+    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
 }
 
 dependencies {

@@ -22,7 +22,7 @@ class CareStorageTest {
             old.execSQL("INSERT INTO residents VALUES (?, ?, 3, 1, '旧版の住民', 35.0, 139.0, '2階', '北', 'SOS')", arrayOf("demo", person))
             old.version = 1
         }
-        fun open() = Room.databaseBuilder(context, PlanDatabase::class.java, name).addMigrations(PlanDatabase.MIGRATION_1_2, PlanDatabase.MIGRATION_2_3, PlanDatabase.MIGRATION_3_4).build()
+        fun open() = Room.databaseBuilder(context, PlanDatabase::class.java, name).addMigrations(PlanDatabase.MIGRATION_1_2, PlanDatabase.MIGRATION_2_3, PlanDatabase.MIGRATION_3_4, PlanDatabase.MIGRATION_4_5).build()
         var db = open()
         try {
             var store = RoomRecordStore(db)
