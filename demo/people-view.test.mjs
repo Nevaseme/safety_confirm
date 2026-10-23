@@ -4,14 +4,14 @@ import {people} from './data.mjs';
 import {NOW,THREE_DAYS} from './clustering.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs';
 
-test('group counts include off-map people without counting stale safety as current',()=>{
+test('group counts retain old positions while never-received positions remain unknown',()=>{
   const counts=listCounts(people);
   assert.equal(counts.all,26);
-  assert.equal(counts.unknown,2);
+  assert.equal(counts.unknown,1);
   assert.equal(counts.sos+counts.unanswered+counts.safe+counts.unknown,counts.all);
   const staleSOS={...people[0],acquiredAt:NOW-THREE_DAYS-1};
-  assert.equal(filterPeople([staleSOS],'sos').length,0);
-  assert.equal(filterPeople([staleSOS],'unknown').length,1);
+  assert.equal(filterPeople([staleSOS],'sos').length,1);
+  assert.equal(filterPeople([staleSOS],'unknown').length,0);
 });
 test('area list uses the exact member ids, independent of global list',()=>{
   const ids=['p0','p1','p8','p0'];

@@ -3,7 +3,7 @@ export const CENTER=[130.8190,32.7904];
 export const NOW=Date.parse('2026-10-21T15:00:00+09:00');
 export const THREE_DAYS=3*86400000;
 export const CLUSTER_END_ZOOM=16;
-export function hasPosition(p){return Array.isArray(p.location)&&Number.isFinite(p.acquiredAt)&&NOW-p.acquiredAt<=THREE_DAYS;}
+export function hasPosition(p){return Array.isArray(p.location)&&Number.isFinite(p.acquiredAt);}
 export function buildIndex(Supercluster,people,showSafe=true){
   const points=people.filter(p=>hasPosition(p)&&(showSafe||!['safe','rescued'].includes(p.s))).map(p=>({type:'Feature',geometry:{type:'Point',coordinates:p.location},properties:{personId:p.id,state:p.s,...Object.fromEntries(STATES.map(s=>[s,Number(s===p.s)]))}}));
   return new Supercluster({radius:70,maxZoom:CLUSTER_END_ZOOM-1,minZoom:0,extent:512,map:p=>Object.fromEntries(STATES.map(s=>[s,p[s]])),reduce:(acc,p)=>STATES.forEach(s=>{acc[s]+=p[s];})}).load(points);

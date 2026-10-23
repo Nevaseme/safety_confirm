@@ -1,7 +1,7 @@
-import {STATES,CENTER,NOW,CLUSTER_END_ZOOM,hasPosition,buildIndex,getNodes,displayCounts,clusterViewport} from './clustering.mjs?v=5';
-import {people,homes,personLabel} from './data.mjs?v=7';
+import {STATES,CENTER,NOW,CLUSTER_END_ZOOM,hasPosition,buildIndex,getNodes,displayCounts,clusterViewport} from './clustering.mjs?v=6';
+import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
-import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs';
+import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -9,7 +9,7 @@ const icon=(name)=>`<i class="ph-${['list','x','caret-right','caret-down','cross
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const symbol=state=>`<span class="symbol ${state}" aria-hidden="true">${state==='sos'?'SOS':state==='unanswered'?'?':icon(state==='rescued'?'user-check':'check-fat')}</span>`;
 const time=stamp=>new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',hour:'2-digit',minute:'2-digit',hour12:false}).format(stamp);
-const age=p=>p.acquiredAt?`${Math.round((NOW-p.acquiredAt)/60000)}分前`:'';
+const age=p=>p.acquiredAt?`${Math.max(0,Math.round((NOW-p.acquiredAt)/60000))}分前`:'';
 const sensor=(name,large=false,enhanced=false)=>`<span class="${large?'obs-icon':'sensor'} ${name==='enclosed'?'enclosed':''}"><img src="assets/${name==='enclosed'?'enclosed.png':enhanced?'impact-collision.svg':'impact.svg'}" alt="${name==='enclosed'?'閉所':'衝撃'}"></span>`;
 const personById=id=>people.find(p=>p.id===id);
 const homeById=id=>homes.find(h=>h.id===id);
@@ -19,7 +19,7 @@ function createFrame(config){
   const section=document.createElement('section');section.className='view';
   section.innerHTML=`<header class="comparison-caption"><h1 class="comparison-label">${escape(config.version)}</h1><p class="comparison-summary">${escape(config.summary)}</p></header><article class="phone ${config.enhanced?'enhanced':''}" id="${config.id}-screen">
   <header class="top"><button class="plain menu" aria-label="メニュー">${icon('list')}</button>${config.enhanced?'<div class="incident-heading"><span class="title">地震発生</span><span class="incident-date">10月21日 14:32 ・ <span data-elapsed>28分前</span></span></div>':'<span class="title">地震発生</span><span class="date">10月21日</span>'}</header>
-  <div class="tools"><label class="toggle-label">無事を表示<button class="switch" role="switch" aria-label="無事を表示" aria-checked="true"></button></label><button class="unknown">${icon('user')}位置不明 2人${icon('caret-right')}</button></div>
+  <div class="tools"><label class="toggle-label">無事を表示<button class="switch" role="switch" aria-label="無事を表示" aria-checked="true"></button></label><button class="unknown">${icon('user')}位置不明 ${people.filter(p=>!hasPosition(p)).length}人${icon('caret-right')}</button></div>
   <div class="map-area"><div class="map" id="${config.id}-map"></div><div class="loading">地図を読み込んでいます</div>
   <button class="legend-trigger">${icon('stack')}凡例${icon('caret-right')}</button><button class="recenter" aria-label="表示の中心に戻る">${icon('crosshair')}</button></div>
   <nav class="nav" aria-label="メイン"><button class="active" data-page="map">${icon('map-trifold')}地図</button>${config.enhanced?`<button data-page="people">${icon('list-bullets')}一覧</button>`:''}<button data-page="safety">${icon('user')}安否</button></nav>
@@ -112,7 +112,7 @@ class MapFrame{
   openPerson(p){
     this.selected=p.id;this.render();
     const home=homeById(p.homeId),needsHelp=['sos','unanswered'].includes(p.s);
-    let location=hasPosition(p)?`${time(p.acquiredAt)}取得・${age(p)}・精度 約${p.accuracy}m`:p.acquiredAt?'3日以上更新なし':'未受信';
+    let location=hasPosition(p)?`${time(p.acquiredAt)}取得・${age(p)}・精度 約${p.accuracy}m`:'未受信';
     const title=`<div class="person-title">${symbol(p.s)}<div><h2>${escape(personLabel(p))}</h2><div class="person-state ${p.s}">${stateText(p)}${p.s==='sos'?`・${p.answeredAt}の回答`:''}</div></div></div><p class="location-line">${icon('map-pin')}最後のスマホ位置　${location}</p>`;
     let body=p.s==='sos'&&p.memo?`<h3>SOSメモ</h3><p class="sos-note">${escape(p.memo)}</p>`:'';
     if(needsHelp){
@@ -140,7 +140,7 @@ class MapFrame{
     this.openSheet(`<h2>${title}</h2>`,list.map(p=>`<button class="person-row" data-id="${p.id}">${symbol(p.s)}<span class="row-content"><strong>${escape(personLabel(p))}</strong><small>${hasPosition(p)?`${stateText(p)}・位置 ${age(p)}`:`普段の住居：${escape(homeById(p.homeId).name)}<br>寝室：${escape(p.bedroom)}`}</small></span>${icon('caret-right')}</button>`).join(''));
     this.body.querySelectorAll('[data-id]').forEach(button=>button.onclick=()=>this.openPerson(personById(button.dataset.id)));
   }
-  showUnknown(){this.showPeople(people.filter(p=>!hasPosition(p)),'位置不明 2人');}
+  showUnknown(){const unknown=people.filter(p=>!hasPosition(p));this.showPeople(unknown,`位置不明 ${unknown.length}人`);}
   showHome(home,backPerson=null){
     const linked=people.filter(p=>p.homeId===home.id),body=`<div class="attrs"><span><small>建築年</small>${home.built}年</span><span><small>建材・構造</small>${home.material}</span><span><small>階数</small>${home.floors}階建</span></div><h3>この建物の登録住民 ${linked.length}人</h3>${linked.map(p=>`<button class="person-row" data-id="${p.id}">${symbol(p.s)}<span class="row-content"><strong>${personLabel(p)}</strong><small>${stateText(p)}・${hasPosition(p)?`最後の位置 ${age(p)}`:'位置不明'}</small></span>${icon('caret-right')}</button>`).join('')}`;
     this.openSheet(`<h2>${home.name}</h2>`,body,backPerson?'<button class="secondary full" data-action="back">人の詳細へ戻る</button>':'');
@@ -182,6 +182,23 @@ class MapFrame{
   }
 }
 class ListMapFrame extends MapFrame{
+  showMenu(){
+    super.showMenu();
+    if(this.config.positionControls){
+      const button=document.createElement('button');button.className='person-row';
+      button.innerHTML=`${icon('crosshair')}<span class="row-content"><strong>位置記録</strong></span>${icon('caret-right')}`;
+      button.onclick=()=>this.showPosition();this.body.prepend(button);
+    }
+  }
+  showPosition(){
+    const self=personById('p5');
+    this.openSheet('<h2>位置記録</h2>',`<h3>${this.positionActive?'位置記録中':'位置記録は停止中'}</h3><p>${this.positionMessage||'架空の位置で操作を確認できます。'}</p><h3>最後に保存した位置</h3><p>${time(self.acquiredAt)}取得 ・ 精度 約${self.accuracy}m</p><p>緯度 ${self.location[1].toFixed(5)} ・ 経度 ${self.location[0].toFixed(5)}</p>`,this.positionActive?'<button class="primary blue" data-position="refresh">今の位置を取得</button><button class="secondary full safety-submit" data-position="stop">位置記録を停止</button>':'<button class="primary blue" data-position="start">位置記録を開始</button>');
+    this.footer.querySelectorAll('[data-position]').forEach(button=>button.onclick=()=>{
+      if(button.dataset.position==='stop'){this.positionActive=false;this.positionMessage='位置記録を停止しました';}
+      else{this.positionActive=true;self.location=[self.location[0]+.00003,self.location[1]+.00002];self.acquiredAt=NOW;self.accuracy=8;this.positionMessage='位置を保存しました';refreshAll();}
+      this.showPosition();this.toast(this.positionMessage);
+    });
+  }
   constructor(config,phone){
     super(config,phone);
     this.page='map';this.listFilter='all';this.areaIds=null;this.areaKey=null;this.areaOpen=false;
@@ -320,3 +337,5 @@ class ListMapFrame extends MapFrame{
 }
 const latestConfig={id:'latest',zoom:config.zoom,enhanced:true,localSituation:true,version:'1.5.4 反映案',summary:'地図・一覧・安否の画面見本。今回の追加：SOSメモの500文字制限と「メモだけ保存」。'};
 frames.push(new ListMapFrame(latestConfig,createFrame(latestConfig)));
+const positionConfig={id:'position',zoom:config.zoom,enhanced:true,localSituation:true,positionControls:true,version:'1.5.5 位置記録',summary:'メニューに位置記録の開始・停止・再取得を追加。Webでは架空の位置で操作できます。'};
+frames.push(new ListMapFrame(positionConfig,createFrame(positionConfig)));

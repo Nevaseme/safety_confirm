@@ -1,4 +1,4 @@
-import {CENTER,NOW} from './clustering.mjs';
+import {CENTER,NOW} from './clustering.mjs?v=6';
 const central=[
   [-.00073,.00058,'sos','山田 太郎',true,true,'2階の寝室にいます。ドアが開かず、外へ出られません。'],
   [.00045,.00078,'sos','佐藤 美咲',false,true,'棚が倒れて通路をふさいでいます。声は出せます。'],

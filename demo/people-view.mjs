@@ -1,4 +1,4 @@
-import {hasPosition,NOW} from './clustering.mjs';
+import {hasPosition,NOW} from './clustering.mjs?v=6';
 
 // The fixture's first earthquake report is at 14:32, before its 15:00 observation time.
 export const FIRST_REPORT_AT=Date.parse('2026-10-21T14:32:00+09:00');
@@ -16,7 +16,7 @@ export function scopedPeople(people,ids=null){
 export function filterPeople(people,filter='all'){
   if(filter==='all')return people;
   if(filter==='unknown')return people.filter(p=>!hasPosition(p));
-  // Old/unreceived locations have their own view, without stale safety assertions.
+  // Only unreceived positions are outside the map; expiry is deferred.
   return people.filter(p=>hasPosition(p)&&(filter==='safe'?['safe','rescued'].includes(p.s):p.s===filter));
 }
 export function listCounts(people){
