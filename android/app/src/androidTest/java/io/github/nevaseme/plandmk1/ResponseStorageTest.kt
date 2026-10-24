@@ -50,6 +50,10 @@ class ResponseStorageTest {
             assertTrue(csv.contains("\"確認へ向かう\""))
             assertTrue(csv.contains("不足1本"))
             assertEquals(3,csv.trimEnd().lines().size)
+            val catalog=RegionCatalog(regions=listOf(RegionDefinition("city","試験市"),RegionDefinition("a","A町内会","city"),RegionDefinition("b","B町内会","city")))
+            val counts=store.reportRegionSummary("trial",incident,catalog,mapOf(reportId to listOf("a","b")))
+            assertEquals(1,counts.regions.single {it.regionId=="city"}.count)
+            assertEquals(setOf(target),counts.regions.single {it.regionId=="city"}.targets)
         }finally {db.close();context.deleteDatabase(name)}
     }
 }

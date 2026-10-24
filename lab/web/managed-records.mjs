@@ -29,37 +29,45 @@ function proof(r,events,e){
  if(e.action!=='FORM')return null;
  const reports=e.reportIds.map(id=>events.find(x=>x.eventId===id&&x.action==='REPORT'&&x.groupId===r.groupId));
  if(reports.some(x=>!x))return null;reports.sort(compare);
- if(!reports.length||reports[0].eventId!==e.targetId||reports.some(x=>x.training!==e.training)||reports.at(-1).operatedAt-reports[0].operatedAt>1800000||new Set(reports.map(x=>memberFor(r,x.actorDeviceId).memberId)).size<requiredReporters(r.members.length))return null;
+ if(!reports.length||reports[0].eventId!==e.targetId||reports.some(x=>x.training!==e.training)||new Set(reports.map(x=>memberFor(r,x.actorDeviceId).memberId)).size<requiredReporters(r.members.length))return null;
  return {groupId:r.groupId,incidentId:reports[0].eventId,firstReportedAt:reports[0].operatedAt,training:e.training,reportIds:reports.map(x=>x.eventId)};
 }
-export function quakeStates(r,events){
+// Reports are partitioned only by a valid administrator END, never by their age.
+function quakePeriods(r,events){
  const relevant=events.filter(e=>e.groupId===r.groupId).map(e=>validateQuake(r,e));
+ const reports=relevant.filter(e=>e.action==='REPORT').sort(compare),byId=new Map(reports.map(e=>[e.eventId,e]));
  const forms=relevant.map(e=>proof(r,relevant,e)).filter(Boolean).sort((a,b)=>a.firstReportedAt-b.firstReportedAt||(a.incidentId<b.incidentId?-1:a.incidentId>b.incidentId?1:0)||a.reportIds.join().localeCompare(b.reportIds.join()));
- const states=[];
+ const periods=[];
  for(const training of [false,true]){
-  const batches=[];for(const f of forms.filter(x=>x.training===training)){const last=batches.at(-1);if(!last||f.firstReportedAt-last[0].firstReportedAt>1800000)batches.push([f]);else last.push(f);}
-  for(const batch of batches){const incidentIds=[...new Set(batch.map(f=>f.incidentId))];states.push({formation:batch[0],incidentIds,closed:relevant.some(e=>e.action==='END'&&e.training===training&&(incidentIds.includes(e.targetId)||e.endedIncidentIds.some(id=>incidentIds.includes(id))))});}
- }
- return states.sort((a,b)=>a.formation.firstReportedAt-b.formation.firstReportedAt||(a.formation.incidentId<b.formation.incidentId?-1:1));
+  let after=-1;
+  while(true){
+   const remaining=forms.filter(f=>f.training===training&&f.reportIds.every(id=>byId.get(id).operatedAt>after));
+   const end=relevant.filter(e=>e.action==='END'&&e.training===training&&e.operatedAt>after&&remaining.some(f=>(f.incidentId===e.targetId||e.endedIncidentIds.includes(f.incidentId))&&f.reportIds.every(id=>byId.get(id).operatedAt<=e.operatedAt))).sort(compare)[0];
+   const until=end?.operatedAt??Infinity;
+   periods.push({training,closed:!!end,reports:reports.filter(e=>e.training===training&&e.operatedAt>after&&e.operatedAt<=until),forms:remaining.filter(f=>f.reportIds.every(id=>byId.get(id).operatedAt<=until))});
+   if(!end)break;after=until;
+  }
+ }return periods;
+}
+export function quakeStates(r,events){
+ return quakePeriods(r,events).filter(p=>p.forms.length).map(p=>({formation:{...p.forms[0],firstReportedAt:p.reports[0].operatedAt},incidentIds:[...new Set(p.forms.map(f=>f.incidentId))],closed:p.closed}))
+ .sort((a,b)=>a.formation.firstReportedAt-b.formation.firstReportedAt||(a.formation.incidentId<b.formation.incidentId?-1:1));
 }
 export function formationCandidates(r,events){
- const reports=events.filter(e=>e.groupId===r.groupId&&e.action==='REPORT').sort(compare);
- const formed=events.map(e=>proof(r,events,e)).filter(Boolean);
+ const reports=events.filter(e=>e.groupId===r.groupId&&e.action==='REPORT');
  const cancelled=new Set(events.filter(e=>e.action==='CANCEL'&&e.groupId===r.groupId&&reports.some(x=>x.eventId===e.targetId&&x.training===e.training&&memberFor(r,x.actorDeviceId).memberId===memberFor(r,e.actorDeviceId).memberId)).map(e=>e.targetId));
- const available=reports.filter(e=>!cancelled.has(e.eventId)&&!formed.some(f=>f.reportIds.includes(e.eventId)||(f.training===e.training&&e.operatedAt>=f.firstReportedAt&&e.operatedAt-f.firstReportedAt<=1800000)));
- const result=[];for(const training of [false,true]){
-  const batches=[];for(const e of available.filter(x=>x.training===training)){const last=batches.at(-1);if(!last||e.operatedAt-last[0].operatedAt>1800000)batches.push([e]);else last.push(e);}
-  for(const batch of batches){const members=new Set(),evidence=[];for(const e of batch){const id=memberFor(r,e.actorDeviceId).memberId;if(!members.has(id)){members.add(id);evidence.push(e);}}
-   if(members.size>=requiredReporters(r.members.length))result.push({groupId:r.groupId,incidentId:evidence[0].eventId,firstReportedAt:evidence[0].operatedAt,training,reportIds:evidence.slice(0,requiredReporters(r.members.length)).map(e=>e.eventId)});
-  }
- }return result;
+ return quakePeriods(r,events).filter(p=>!p.closed&&!p.forms.length).flatMap(p=>{
+  const evidence=[],members=new Set();for(const e of p.reports.filter(e=>!cancelled.has(e.eventId))){const member=memberFor(r,e.actorDeviceId).memberId;if(!members.has(member)){members.add(member);evidence.push(e);}}
+  const needed=requiredReporters(r.members.length);if(evidence.length<needed)return [];
+  return [{groupId:r.groupId,incidentId:evidence[0].eventId,firstReportedAt:evidence[0].operatedAt,training:p.training,reportIds:evidence.slice(0,needed).map(e=>e.eventId)}];
+ });
 }
 export function validateQuakeCommand(r,events,input){
  const e=validateQuake(r,input),states=quakeStates(r,events);
  if(e.action==='CANCEL'){
   const report=events.find(x=>x.eventId===e.targetId&&x.action==='REPORT'&&x.groupId===e.groupId);
   check(report&&report.training===e.training&&memberFor(r,report.actorDeviceId).memberId===memberFor(r,e.actorDeviceId).memberId,'自分の報告だけ取り消せます');
-  check(!events.some(x=>{const f=proof(r,events,x);return f&&(f.reportIds.includes(report.eventId)||(report.training===f.training&&report.operatedAt>=f.firstReportedAt&&report.operatedAt-f.firstReportedAt<=1800000));}),'成立した報告は取り消せません');
+  check(!quakePeriods(r,events).some(p=>p.forms.length&&p.reports.some(x=>x.eventId===report.eventId)),'成立した報告は取り消せません');
  }else if(e.action==='FORM')check(formationCandidates(r,events).some(f=>sameRecord(f,proof(r,events,e))),'成立に必要な報告がありません');
  else if(e.action==='END')check(states.some(s=>s.incidentIds.includes(e.targetId)&&e.endedIncidentIds.every(id=>s.incidentIds.includes(id))&&s.formation.training===e.training&&!s.closed),'開始中の災害を指定してください');
  return e;
@@ -109,7 +117,7 @@ export function managedIncidentOptions(journal,roster,quakes){
  const views=states.flatMap(state=>{
   const related=originals.filter(v=>state.incidentIds.includes(v.start.eventId)),canonical=related.find(v=>v.start.eventId===state.formation.incidentId);if(!canonical)return [];
   const answers={};for(const answer of related.flatMap(v=>Object.values(v.answers)).sort((a,b)=>a.createdAt-b.createdAt||a.sequence-b.sequence||(a.eventId<b.eventId?-1:1)))answers[answer.authorId]=answer;
-  return [{...canonical,closed:state.closed,answers,care:related.flatMap(v=>v.care)}];
+  return [{...canonical,start:{...canonical.start,createdAt:state.formation.firstReportedAt},closed:state.closed,answers,care:related.flatMap(v=>v.care)}];
  });return [...views,...originals.filter(v=>!ids.has(v.start.eventId)).map(v=>({...v,closed:true}))].sort((a,b)=>b.start.createdAt-a.start.createdAt||(a.start.eventId<b.start.eventId?-1:1));
 }
 export const canonicalIncidentId=(roster,quakes,id)=>roster?quakeStates(roster,quakes).find(s=>s.incidentIds.includes(id))?.formation.incidentId??id:id;

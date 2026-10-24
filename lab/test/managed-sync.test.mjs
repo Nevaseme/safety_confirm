@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {indexedDB} from 'fake-indexeddb';
 import {readFile} from 'node:fs/promises';
 import {Store,SyncEngine} from '../web/sync.mjs';
-import {quakeStates,formationCandidates,responseHeads,validateQuakeCommand} from '../web/managed-records.mjs';
+import {quakeStates,formationCandidates,responseHeads,validateQuakeCommand,managedIncidentOptions} from '../web/managed-records.mjs';
 const id=()=>crypto.randomUUID(),group='trial';
 const members=Array.from({length:4},(_,i)=>{const memberId=id();return {memberId,activityName:'確認'+i,role:i===0?'ADMIN':'MEMBER',deviceIds:[memberId]};});
 const roster={version:1,groupId:group,members},ids=members.map(m=>m.memberId);
@@ -84,4 +84,35 @@ test('failed writes have no ACK; unknown roster, conflicting IDs and unauthorize
  const b={...response(ids[0],r.eventId,{...event.change,description:'訂正B'},id(),[event.eventId]),sequence:10};await s.mergeResponse(b);
  assert.deepEqual(new Set(responseHeads(roster,await s.responseEvents(group)).map(e=>e.eventId)),new Set([a.eventId,b.eventId]));
  assert.equal(errors.length,3);s.close();
+});
+
+
+test('unlimited reporting uses admin end rather than elapsed time, including reordered delivery',async()=>{
+ const s=await open();await s.importRoster(roster,ids[0]);const day=86400000;
+ const old=[report(ids[0],0),report(ids[1],day*7)];
+ for(const e of old)await s.commandQuake(e);
+ assert.equal(quakeStates(roster,await s.quakeEvents(group)).length,1);
+ const end={groupId:group,eventId:id(),actorDeviceId:ids[0],operatedAt:day*8,action:'END',training:false,targetId:old[0].eventId};
+ await s.commandQuake(end);await s.commandQuake(report(ids[2],day*3));
+ const fresh=[report(ids[0],day*9),report(ids[1],day*20)];
+ for(const e of fresh)await s.commandQuake(e);
+ await s.mergeQuake({...end,eventId:id(),operatedAt:day*30});
+ await s.commandQuake(report(ids[3],day*40));
+ const events=await s.quakeEvents(group),states=quakeStates(roster,events);
+ assert.deepEqual(states.map(s=>s.closed),[true,false]);
+ assert.equal(states[1].formation.incidentId,fresh[0].eventId);
+ assert.deepEqual(quakeStates(roster,events.toReversed()),states);
+ const name=s.name;s.close();const reopened=await Store.open(name,indexedDB);
+ assert.deepEqual(quakeStates(roster,await reopened.quakeEvents(group)),states);reopened.close();
+});
+
+
+test('late earlier report updates elapsed origin while preserving the formed incident ID',()=>{
+ const reports=[report(ids[0],100),report(ids[1],101)];
+ const f=formationCandidates(roster,reports)[0];
+ const formed={groupId:group,eventId:id(),actorDeviceId:ids[0],operatedAt:101,action:'FORM',training:false,targetId:f.incidentId,reportIds:f.reportIds};
+ const history=[...reports,formed,report(ids[2],0)];const state=quakeStates(roster,history)[0];
+ assert.equal(state.formation.incidentId,reports[0].eventId);assert.equal(state.formation.firstReportedAt,0);
+ const start={groupId:group,eventId:reports[0].eventId,incidentId:reports[0].eventId,authorId:ids[0],authorName:'確認班',sequence:1,createdAt:100,kind:'START',title:'地震',area:'地域',training:false};
+ assert.equal(managedIncidentOptions([start],roster,history)[0].start.createdAt,0);
 });

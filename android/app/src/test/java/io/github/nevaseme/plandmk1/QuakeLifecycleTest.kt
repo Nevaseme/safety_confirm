@@ -77,4 +77,44 @@ class QuakeLifecycleTest {
         assertTrue(after.all {it.closed})
         assertEquals(after,quakeStates(roster,(firstHistory+end+early+form(early)).reversed()))
     }
+    @Test fun daysApartReportsFormWithoutExpiryAndEndSeparatesFreshReports() {
+        val day=24*60*60_000L
+        val old=listOf(report(a,0),report(b,day*7))
+        val f=formationCandidates(roster,old).single().event(id(),a,day*7)
+        val end=QuakeEvent("trial",id(),a,day*8,QuakeAction.END,false,targetId=old.first().eventId)
+        val delayed=report(c,day*3)
+        val fresh=listOf(report(a,day*9),report(b,day*20))
+        val history=old+f+end+delayed+fresh
+        val next=formationCandidates(roster,history).single()
+        assertEquals(fresh.map {it.eventId},next.reportIds)
+        val all=history+next.event(id(),b,day*20)
+        val states=quakeStates(roster,all)
+        assertEquals(listOf(true,false),states.map {it.closed})
+        assertEquals(states,quakeStates(roster,all.reversed()))
+        assertTrue(formationCandidates(roster,all+report(c,day*40)).isEmpty())
+    }
+    @Test fun delayedDuplicateEndDoesNotCloseNextEarthquakeOrReuseOldVotes() {
+        val old=listOf(report(a,0),report(b,1));val f=formationCandidates(roster,old).single().event(id(),a,1)
+        val end=QuakeEvent("trial",id(),a,2,QuakeAction.END,false,targetId=old.first().eventId)
+        val fresh=listOf(report(a,3),report(b,4));val next=formationCandidates(roster,fresh).single().event(id(),a,4)
+        val duplicateEnd=end.copy(eventId=id(),operatedAt=10)
+        val history=old+f+end+fresh+next+duplicateEnd
+        assertEquals(listOf(true,false),quakeStates(roster,history).map {it.closed})
+        val mixed=listOf(old.first(),fresh.last())
+        val stale=formationCandidates(roster,mixed).single().event(id(),a,4)
+        assertEquals(listOf(true),quakeStates(roster,old+f+end+fresh.last()+stale).map {it.closed})
+        assertTrue(formationCandidates(roster,old+f+end+fresh.last()+stale).isEmpty())
+    }
+
+    @Test fun lateEarlierReportUpdatesElapsedOriginAndKeepsIncidentId() {
+        val reports=listOf(report(a,100),report(b,101))
+        val f=formationCandidates(roster,reports).single().event(id(),a,101)
+        val history=reports+f+report(c,0)
+        val state=quakeStates(roster,history).single()
+        assertEquals(reports.first().eventId,state.formation.incidentId)
+        assertEquals(0L,state.formation.firstReportedAt)
+        val start=IncidentEvent("trial",reports.first().eventId,reports.first().eventId,a,"確認班",1,100,IncidentKind.START,"地震","地域",false)
+        assertEquals(0L,managedIncidentOptions(listOf(start),roster,history).single().start.createdAt)
+    }
+
 }

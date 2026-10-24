@@ -1,10 +1,19 @@
 import {validateRoster,memberFor,validateQuake,validateQuakeCommand,formationCandidates,quakeStates,validateResponse,validateResponseCommand,responseHeads,sameRecord,canonicalIncidentId} from './managed-records.mjs';
+import {regionalSummary} from './regions.mjs';
 
 export class ManagedStore {
  constructor(db){this.db=db;}
  roster(group){return this.read('rosters',group);}
  async quakeEvents(group){return (await this.read('quakes')).filter(e=>e.groupId===group);}
  async responseEvents(group){return (await this.read('responses')).filter(e=>e.groupId===group);}
+ reportRegionSummary(group,incidentId,catalog,assignments={}){return this.managedTransaction(tables=>{
+  const roster=tables.rosters.find(r=>r.groupId===group);if(!roster)throw Error('参加者設定を読み込んでください');
+  const quakes=tables.quakes.filter(e=>e.groupId===group),selected=canonicalIncidentId(roster,quakes,incidentId);
+  if(!quakeStates(roster,quakes).some(s=>s.formation.incidentId===selected))throw Error('集計する災害を選んでください');
+  const heads=responseHeads(roster,tables.responses.filter(e=>e.groupId===group).map(e=>({...e,incidentId:canonicalIncidentId(roster,quakes,e.incidentId)})));
+  const reports=[...new Set(heads.filter(e=>e.incidentId===selected&&e.change.type==='REPORT').map(e=>e.change.reportId))];
+  return regionalSummary(catalog,reports.map(id=>({target:{kind:'REPORT',id},regionIds:assignments[id]||[]})));
+ });}
  // All reads, validation and writes are inside one transaction; ACK callers await oncomplete.
  managedTransaction(work){return new Promise((resolve,reject)=>{
   const names=['rosters','quakes','responses','incidents','residents'];

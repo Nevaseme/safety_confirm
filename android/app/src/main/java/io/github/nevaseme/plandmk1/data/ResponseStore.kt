@@ -16,6 +16,13 @@ data class ResponseRow(val groupId:String,val eventId:String,val payload:String)
 }
 class ResponseStore(private val db:PlanDatabase) {
     private val quakes=QuakeStore(db)
+    suspend fun reportRegionSummary(group:String,incidentId:String,catalog:RegionCatalog,assignments:Map<String,List<String>>):RegionalSummary=db.withTransaction {
+        val roster=requireNotNull(quakes.roster(group));val quakeHistory=quakes.events(group)
+        val selected=canonicalIncidentId(roster,quakeHistory,incidentId)
+        require(quakeStates(roster,quakeHistory).any {it.formation.incidentId==selected}) {"集計する災害を選んでください"}
+        val reports=heads(group).filter {it.incidentId==selected}.mapNotNull {(it.change as? ResponseChange.Report)?.reportId}.distinct()
+        regionalSummary(catalog,reports.map {RegionCase(ResponseTarget(TargetKind.REPORT,it),assignments[it].orEmpty())})
+    }
     suspend fun exportCsv(group:String,incidentId:String,regions:Map<ResponseTarget,List<String>> = emptyMap()):String=db.withTransaction {
         val roster=requireNotNull(quakes.roster(group)) {"参加者設定を読み込んでください"};val records=RoomRecordStore(db)
         operationCsv(operationRows(roster,incidentId,records.all(group),records.incidents(group),quakes.events(group),events(group),regions))

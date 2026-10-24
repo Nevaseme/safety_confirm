@@ -34,42 +34,48 @@ private fun proof(roster:MemberRoster,events:List<QuakeEvent>,formed:QuakeEvent)
     val byId=reportsFor(roster,events).associateBy {it.eventId}
     val reports=formed.reportIds.map {byId[it]?:return null}.sortedWith(compareBy<QuakeEvent> {it.operatedAt}.thenBy {it.eventId})
     if(reports.isEmpty() || reports.any {it.training!=formed.training} || reports.first().eventId!=formed.targetId)return null
-    if(reports.last().operatedAt-reports.first().operatedAt>30*60_000L)return null
     if(reports.map {roster.memberForDevice(it.actorDeviceId).memberId}.distinct().size<requiredEarthquakeReporters(roster.members.size))return null
     return QuakeFormation(roster.groupId,reports.first().eventId,reports.first().operatedAt,formed.training,reports.map {it.eventId})
 }
-fun quakeStates(roster:MemberRoster,events:List<QuakeEvent>):List<QuakeState> {
-    val relevant=events.filter {it.groupId==roster.groupId}
-    relevant.forEach {it.validate(roster)}
+private data class QuakePeriod(val training:Boolean,val reports:List<QuakeEvent>,val forms:List<QuakeFormation>,val closed:Boolean)
+/** Only a verified administrator END separates reporting rounds. Reports themselves never expire. */
+private fun quakePeriods(roster:MemberRoster,events:List<QuakeEvent>):List<QuakePeriod> {
+    val relevant=events.filter {it.groupId==roster.groupId};relevant.forEach {it.validate(roster)}
+    val reports=reportsFor(roster,relevant).sortedWith(compareBy<QuakeEvent> {it.operatedAt}.thenBy {it.eventId})
+    val byId=reports.associateBy {it.eventId}
     val forms=relevant.mapNotNull {proof(roster,relevant,it)}.sortedWith(compareBy<QuakeFormation> {it.firstReportedAt}.thenBy {it.incidentId}.thenBy {it.reportIds.joinToString()})
-    // Group by the first report, not a rolling window. Stored proofs and their original IDs remain intact.
     return listOf(false,true).flatMap {training->
-        val batches=mutableListOf<MutableList<QuakeFormation>>()
-        forms.filter {it.training==training}.forEach {form->
-            val last=batches.lastOrNull()
-            if(last==null || form.firstReportedAt-last.first().firstReportedAt>30*60_000L)batches.add(mutableListOf(form))
-            else last.add(form)
+        val periods=mutableListOf<QuakePeriod>();var after=-1L
+        while(true) {
+            val remaining=forms.filter {it.training==training&&it.reportIds.all {id->byId.getValue(id).operatedAt>after}}
+            val end=relevant.filter {e->e.action==QuakeAction.END&&e.training==training&&e.operatedAt>after&&roster.memberForDevice(e.actorDeviceId).role==MemberRole.ADMIN&&remaining.any {f->
+                (f.incidentId==e.targetId||f.incidentId in e.endedIncidentIds)&&f.reportIds.all {id->byId.getValue(id).operatedAt<=e.operatedAt}
+            }}.minWithOrNull(compareBy<QuakeEvent> {it.operatedAt}.thenBy {it.eventId})
+            val until=end?.operatedAt?:Long.MAX_VALUE
+            periods+=QuakePeriod(training,reports.filter {it.training==training&&it.operatedAt>after&&it.operatedAt<=until},remaining.filter {it.reportIds.all {id->byId.getValue(id).operatedAt<=until}},end!=null)
+            if(end==null)break
+            after=until
         }
-        batches.map {batch->
-            val selected=batch.first();val ids=batch.map {it.incidentId}.toSet()
-            QuakeState(selected,relevant.any {it.action==QuakeAction.END && (it.targetId in ids||it.endedIncidentIds.any {id->id in ids}) && it.training==training && roster.memberForDevice(it.actorDeviceId).role==MemberRole.ADMIN},ids)
-        }
-    }.sortedWith(compareBy<QuakeState> {it.formation.firstReportedAt}.thenBy {it.formation.incidentId})
+        periods
+    }
 }
+fun quakeStates(roster:MemberRoster,events:List<QuakeEvent>):List<QuakeState> =
+    quakePeriods(roster,events).filter {it.forms.isNotEmpty()}.map {QuakeState(it.forms.first().copy(firstReportedAt=it.reports.minOf {r->r.operatedAt}),it.closed,it.forms.map {f->f.incidentId}.toSet())}
+        .sortedWith(compareBy<QuakeState> {it.formation.firstReportedAt}.thenBy {it.formation.incidentId})
+
 fun formationCandidates(roster:MemberRoster,events:List<QuakeEvent>):List<QuakeFormation> {
-    val reports=reportsFor(roster,events);val byId=reports.associateBy {it.eventId}
-    val formed=events.mapNotNull {proof(roster,events,it)}
+    val byId=reportsFor(roster,events).associateBy {it.eventId}
     val cancelled=events.filter {cancel->
-        cancel.groupId==roster.groupId && cancel.action==QuakeAction.CANCEL && byId[cancel.targetId]?.let {
-            it.training==cancel.training && roster.memberForDevice(it.actorDeviceId).memberId==roster.memberForDevice(cancel.actorDeviceId).memberId
+        cancel.groupId==roster.groupId&&cancel.action==QuakeAction.CANCEL&&byId[cancel.targetId]?.let {
+            it.training==cancel.training&&roster.memberForDevice(it.actorDeviceId).memberId==roster.memberForDevice(cancel.actorDeviceId).memberId
         }==true
     }.mapNotNull {it.targetId}.toSet()
-    val available=reports.filter {report-> report.eventId !in cancelled && formed.none {report.eventId in it.reportIds || (report.training==it.training && report.operatedAt>=it.firstReportedAt && report.operatedAt-it.firstReportedAt<=30*60_000L)} }
-    return listOf(false,true).flatMap {training->
-        pendingEarthquakeWindows(available.map {EarthquakeReport(it.eventId,it.groupId,roster.memberForDevice(it.actorDeviceId).memberId,it.operatedAt,it.training)},roster.groupId,roster.members.map {it.memberId}.toSet(),training)
-            .filter {it.hasEnoughReports}.map {window->
-                val evidence=window.reportIds.map {byId.getValue(it)}.distinctBy {roster.memberForDevice(it.actorDeviceId).memberId}.take(window.requiredReporters)
-                QuakeFormation(roster.groupId,evidence.first().eventId,window.firstReportedAt,training,evidence.map {it.eventId})
+    return quakePeriods(roster,events).filter {!it.closed&&it.forms.isEmpty()}.flatMap {period->
+        val available=period.reports.filter {it.eventId !in cancelled}
+        pendingEarthquakeGroups(available.map {EarthquakeReport(it.eventId,it.groupId,roster.memberForDevice(it.actorDeviceId).memberId,it.operatedAt,it.training)},roster.groupId,roster.members.map {it.memberId}.toSet(),period.training)
+            .filter {it.hasEnoughReports}.map {group->
+                val evidence=group.reportIds.map {byId.getValue(it)}.distinctBy {roster.memberForDevice(it.actorDeviceId).memberId}.take(group.requiredReporters)
+                QuakeFormation(roster.groupId,evidence.first().eventId,group.firstReportedAt,period.training,evidence.map {it.eventId})
             }
     }
 }
@@ -80,7 +86,7 @@ fun validateQuakeCommand(roster:MemberRoster,events:List<QuakeEvent>,event:Quake
         QuakeAction.CANCEL -> {
             val report=requireNotNull(events.find {it.eventId==event.targetId && it.groupId==event.groupId && it.action==QuakeAction.REPORT}) {"取り消す報告がありません"}
             require(report.training==event.training && roster.memberForDevice(report.actorDeviceId).memberId==roster.memberForDevice(event.actorDeviceId).memberId) {"自分の報告だけ取り消せます"}
-            require(events.mapNotNull {proof(roster,events,it)}.none {report.eventId in it.reportIds || (report.training==it.training && report.operatedAt>=it.firstReportedAt && report.operatedAt-it.firstReportedAt<=30*60_000L)}) {"成立した地震の報告は取り消せません"}
+            require(quakePeriods(roster,events).none {it.forms.isNotEmpty()&&it.reports.any {r->r.eventId==report.eventId}}) {"成立した地震の報告は取り消せません"}
         }
         QuakeAction.FORM -> require(formationCandidates(roster,events).any {it==proof(roster,events,event)}) {"成立に必要な報告がありません"}
         QuakeAction.END -> {
@@ -96,7 +102,7 @@ fun managedIncidentOptions(journal:List<IncidentEvent>,roster:MemberRoster?,quak
     val managed=states.mapNotNull {state->
         val views=originals.filter {it.start.eventId in state.incidentIds}
         val canonical=views.find {it.start.eventId==state.formation.incidentId}?:return@mapNotNull null
-        canonical.copy(closed=state.closed,
+        canonical.copy(start=canonical.start.copy(createdAt=state.formation.firstReportedAt),closed=state.closed,
             answers=views.flatMap {it.answers.values}.groupBy {it.authorId}.mapValues {(_,answers)->answers.maxWith(compareBy<IncidentEvent> {it.createdAt}.thenBy {it.sequence}.thenBy {it.eventId})},
             care=views.flatMap {it.care}.distinctBy {it.eventId})
     }

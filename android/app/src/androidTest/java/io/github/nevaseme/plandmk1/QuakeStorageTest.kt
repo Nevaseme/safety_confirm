@@ -21,7 +21,7 @@ class QuakeStorageTest {
         fun report(actor:String,time:Long)=QuakeEvent("trial",UUID.randomUUID().toString(),actor,time,QuakeAction.REPORT,false,title="地震",area="地域")
         try {
             var store=QuakeStore(db);store.importRoster(roster.encode(),a)
-            val first=report(a,1);val second=report(b,2)
+            val first=report(a,1);val second=report(b,7*86400_000L)
             assertTrue(store.command(first).isEmpty())
             assertEquals(1,store.command(second).size)
             val before=store.events("trial")
@@ -30,7 +30,7 @@ class QuakeStorageTest {
             assertEquals(before,store.events("trial"))
             store.merge(cancel)
             assertFalse(store.states("trial").single().closed)
-            val end=QuakeEvent("trial",UUID.randomUUID().toString(),a,3,QuakeAction.END,false,targetId=first.eventId)
+            val end=QuakeEvent("trial",UUID.randomUUID().toString(),a,8*86400_000L,QuakeAction.END,false,targetId=first.eventId)
             try {store.command(end.copy(actorDeviceId=b));fail("admin only")}catch(_:IllegalArgumentException){}
             store.command(end)
             db.close();db=open();store=QuakeStore(db)
@@ -39,6 +39,12 @@ class QuakeStorageTest {
             assertFalse(store.merge(before.single {it.action==QuakeAction.FORM}))
             assertTrue(store.states("trial").single().closed)
             assertTrue(store.states("other").isEmpty())
+            store.command(report(a,9*86400_000L))
+            assertEquals(1,store.states("trial").size)
+            store.command(report(b,20*86400_000L))
+            store.command(report(a,4*86400_000L))
+            db.close();db=open();store=QuakeStore(db)
+            assertEquals(listOf(true,false),store.states("trial").map {it.closed})
         } finally {db.close();context.deleteDatabase(name)}
     }
 }
