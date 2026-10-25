@@ -2,7 +2,7 @@ import {STATES,CENTER,NOW,CLUSTER_END_ZOOM,hasPosition,buildIndex,getNodes,displ
 import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
-import {OperationsDemo} from './operations-demo.mjs?v=1';
+import {OperationsDemo} from './operations-demo.mjs?v=2';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -344,4 +344,9 @@ const responseConfig={id:'response',zoom:config.zoom,enhanced:true,localSituatio
 const responseFrame=new ListMapFrame(responseConfig,createFrame(responseConfig));
 frames.push(responseFrame);
 new OperationsDemo(responseFrame,{people,refreshAll});
+const feedbackConfig={id:'response-feedback',zoom:config.zoom,enhanced:true,localSituation:true,positionControls:true,version:'Web案 1.6.1 操作改善',summary:'完了通知の重なりを解消し、状態と担当を分けて表示。通報の取り消し・履歴確認と地図からの地点指定を追加したWeb案です（Android画面は未実装）。'};
+const feedbackFrame=new ListMapFrame(feedbackConfig,createFrame(feedbackConfig));
+frames.push(feedbackFrame);
+new OperationsDemo(feedbackFrame,{people,refreshAll,feedback:true});
 if(query.get('demo')==='response'||location.hash==='#response-demo')requestAnimationFrame(()=>responseFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+if(query.get('demo')==='feedback'||location.hash==='#response-feedback-demo')requestAnimationFrame(()=>feedbackFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));

@@ -12,6 +12,17 @@ export const MEMBERS=[{id:'self',name:'自分'},{id:'north',name:'北班'},{id:'
 export const caseCategory=value=>CATEGORIES.includes(value)?value:'その他';
 export const regionName=id=>REGIONS.find(r=>r.id===id)?.name||'地域未設定';
 export const memberName=id=>MEMBERS.find(r=>r.id===id)?.name||id;
+export function workSummary(row){return {status:row.cancelled?'取り消し済み':row.status,assignment:row.assignees.length?'担当：'+row.assignees.map(memberName).join('・'):'担当者無し'};}
+export function cancelReport(row,reason){
+  if(row.personId)throw Error('SOSは本人の安否画面で更新します');
+  if(!reason?.trim())throw Error('取り消しの理由を入力してください');
+  row.cancelled=true;row.cancelReason=reason.trim();row.updatedAt='10月26日 15:00';
+  (row.history??=[]).push({text:'通報を取り消し：'+row.cancelReason,author:'自分',at:row.updatedAt});
+}
+export function restoreReport(row){
+  row.cancelled=false;row.updatedAt='10月26日 15:00';
+  (row.history??=[]).push({text:'通報の取り消しを戻す',author:'自分',at:row.updatedAt});
+}
 export function seedCases(people){
   const common={status:'未対応',result:'',urgency:'未設定',reason:'',createdBy:'north',updatedAt:'10月26日 14:45'};
   const sos=people.filter(p=>p.s==='sos').map((p,i)=>({...common,id:`sos-${p.id}`,personId:p.id,title:p.name||'SOSの人',description:p.memo||'助けを求めています。',category:'SOS',regionIds:[['east','central','west'][i%3]],assignees:i===0?[]:i===2?['self']:['north'],status:i===2?'対応中':'未対応',urgency:i===0?'高':'未設定',reason:i===0?'けがにより移動が困難':'',materials:[],history:[]}));
@@ -24,11 +35,11 @@ export function seedCases(people){
   return [...sos,...reports];
 }
 export function filterCases(rows,filter='all',member='self'){
-  return rows.filter(r=>filter==='none'?r.assignees.length===0:filter==='mine'?r.assignees.includes(member):true);
+  return rows.filter(r=>!r.cancelled).filter(r=>filter==='none'?r.assignees.length===0:filter==='mine'?r.assignees.includes(member):true);
 }
 export function summarizeCases(rows,regionId='all',type=null){
   const unique=new Map();
-  for(const row of rows){
+  for(const row of rows.filter(r=>!r.cancelled)){
     const old=unique.get(row.id);
     unique.set(row.id,{...row,regionIds:[...new Set([...(old?.regionIds||[]),...(row.regionIds||[])])]});
   }
@@ -58,6 +69,6 @@ export function caseTitle(row,people=[]){
 export function casesCsv(rows,people=[]){
   const quote=value=>{let text=String(value??'');if(/^[\s]*[=+@-]/.test(text))text="'"+text;return '"'+text.replaceAll('"','""')+'"';};
   const headers=['地域','対象ID','種別','氏名・対象','状況','緊急度','担当の活動名','対応結果','内容','必要資材','不足数','更新日時'];
-  const values=rows.map(r=>[(r.regionIds||[]).map(regionName).join('／')||'地域未設定',r.id,caseCategory(r.category),caseTitle(r,people),r.status,r.urgency,(r.assignees||[]).map(memberName).join('／'),r.result,r.description,(r.materials||[]).map(m=>`${m.name} ${m.needed}${m.unit}（手配済み ${m.arranged}${m.unit}）`).join('／'),(r.materials||[]).map(m=>`${m.name} ${Math.max(0,m.needed-m.arranged)}${m.unit}`).join('／'),r.updatedAt]);
+  const values=rows.filter(r=>!r.cancelled).map(r=>[(r.regionIds||[]).map(regionName).join('／')||'地域未設定',r.id,caseCategory(r.category),caseTitle(r,people),r.status,r.urgency,(r.assignees||[]).map(memberName).join('／'),r.result,r.description,(r.materials||[]).map(m=>`${m.name} ${m.needed}${m.unit}（手配済み ${m.arranged}${m.unit}）`).join('／'),(r.materials||[]).map(m=>`${m.name} ${Math.max(0,m.needed-m.arranged)}${m.unit}`).join('／'),r.updatedAt]);
   return '\uFEFF'+[headers,...values].map(row=>row.map(quote).join(',')).join('\r\n')+'\r\n';
 }

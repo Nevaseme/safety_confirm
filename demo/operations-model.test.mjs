@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CATEGORIES,REGIONS,seedCases,filterCases,summarizeCases,caseCategory,casesCsv,saveMaterial} from './operations-model.mjs';
+import {CATEGORIES,REGIONS,seedCases,filterCases,summarizeCases,caseCategory,casesCsv,saveMaterial,cancelReport,restoreReport,workSummary} from './operations-model.mjs';
 
 const sample=[
   {id:'a',category:'SOS',regionIds:['east','east-ward'],assignees:[]},
@@ -59,4 +59,30 @@ test('CSV uses the same cases and protects quotes, newlines, formula text and sa
   assert.ok(!csv.includes('=1+1'));
   const other=casesCsv([{...sample[1],title:'=1+1',description:'一行\n二行',materials:[],history:[],status:'未対応'}]);
   assert.ok(other.includes("'=1+1"));assert.ok(other.includes('一行\n二行'));assert.ok(other.endsWith('\r\n'));
+});
+
+test('cancelling retains the report and its history but excludes it from queues, totals and CSV',()=>{
+  const rows=structuredClone(sample);const row=rows[1];row.history=[{text:'対応を開始'}];
+  cancelReport(row,'重複した通報のため');
+  assert.equal(rows.length,4);
+  assert.equal(row.history[0].text,'対応を開始');
+  assert.equal(row.history.at(-1).text,'通報を取り消し：重複した通報のため');
+  assert.equal(filterCases(rows,'all').length,3);
+  assert.equal(summarizeCases(rows,'all').total,3);
+  assert.equal(summarizeCases(rows,'city','道路閉塞').total,0);
+  assert.ok(!casesCsv(rows).includes('"b"'));
+  restoreReport(row);
+  assert.equal(filterCases(rows,'mine').length,1);
+  assert.equal(summarizeCases(rows,'all').total,4);
+  assert.ok(casesCsv(rows).includes('"b"'));
+  assert.equal(row.history.at(-1).text,'通報の取り消しを戻す');
+});
+test('cancellation requires a reason and does not alter a personal SOS answer',()=>{
+  assert.throws(()=>cancelReport({...sample[1]},''));
+  assert.throws(()=>cancelReport({...sample[0],personId:'p0'},'間違い'));
+});
+test('work status and assigned team have distinct labels',()=>{
+  assert.deepEqual(workSummary({status:'未対応',assignees:['north']}),{status:'未対応',assignment:'担当：北班'});
+  assert.deepEqual(workSummary({status:'対応中',assignees:['self','north']}),{status:'対応中',assignment:'担当：自分・北班'});
+  assert.deepEqual(workSummary({status:'未対応',assignees:[]}),{status:'未対応',assignment:'担当者無し'});
 });
