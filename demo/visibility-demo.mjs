@@ -157,7 +157,7 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
     }
     showLegend(){super.showLegend();this.body.insertAdjacentHTML('beforeend',`<h3>通報の緊急度</h3>${['高','中','低','未設定'].map(urgency=>`<div class="legend-row visibility-legend">${reportSymbol({urgency})}<span>${urgency==='未設定'?'未設定（判定前）':'緊急度 '+urgency}</span></div>`).join('')}`);}
   }
-  const config={id:'response-visibility',zoom,enhanced:true,localSituation:true,positionControls:true,people:[],homes:structuredClone(homes),version:'Web案 1.6.4 公開範囲・通報アイコン',summary:'担当外の注意表示と、地域・立場ごとの公開範囲、反応なしの3分待機、通報の緊急度アイコンを追加。架空データで表示を試すWeb案です（Android・実データの権限制御は未実装）。'};
+  const config={id:'response-visibility',zoom,enhanced:true,localSituation:true,positionControls:true,people:[],homes:structuredClone(homes),version:'Web案 1.6.4 公開範囲・通報アイコン',summary:'地域・立場ごとの公開範囲と、反応なしの3分待機・通報の緊急度アイコンを追加。架空データで表示を試すWeb案です（Android・実データの権限制御は未実装）。'};
   if(overview)Object.assign(config,{id:'response-map',zoom:15.2,version:'Web案 1.6.5 町内会の要約と地図整理',summary:'町内会の要約に未完了の高緊急通報と資材不足の有無を追加。詳細で品目・不足数を確認でき、個別位置では近接するSOSと通報をまとめたWeb案です（Android未反映）。'});
   const frame=new VisibilityFrame(config,createFrame(config)),visibility=new VisibilityController(frame,people,config.homes);
   new VisibilityOperations(frame,visibility,refreshAll);visibility.apply();if(overview)installMapOverview(frame);return frame;

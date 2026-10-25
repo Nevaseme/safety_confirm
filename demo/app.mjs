@@ -3,7 +3,7 @@ import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
 import {OperationsDemo} from './operations-demo.mjs?v=4';
-import {mountVisibilityDemo} from './visibility-demo.mjs?v=3';
+import {mountVisibilityDemo} from './visibility-demo.mjs?v=4';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -341,17 +341,15 @@ class ListMapFrame extends MapFrame{
     });
   }
 }
-const latestConfig={id:'latest',zoom:config.zoom,enhanced:true,localSituation:true,version:'1.5.4 反映案',summary:'地図・一覧・安否の画面見本。今回の追加：SOSメモの500文字制限と「メモだけ保存」。'};
-frames.push(new ListMapFrame(latestConfig,createFrame(latestConfig)));
-const stagesConfig={id:'response-stages',zoom:config.zoom,enhanced:true,localSituation:true,positionControls:true,version:'Web案 1.6.2 対応状況を4段階に',summary:'担当・通報・活動・資材・CSV・地域集計と、通報の取り消し・地図からの追加を搭載。対応状況を未対応・対応予定・対応中・対応済みの4段階にしたWeb案です（Android画面は未実装）。'};
-const stagesFrame=new ListMapFrame(stagesConfig,createFrame(stagesConfig));
-frames.push(stagesFrame);
-new OperationsDemo(stagesFrame,{people,refreshAll,feedback:true,fourStage:true});
-if(['stages','response','feedback'].includes(query.get('demo'))||['#response-stages-demo','#response-demo','#response-feedback-demo'].includes(location.hash))requestAnimationFrame(()=>stagesFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+const assignmentConfig={id:'response-assignment',zoom:config.zoom,enhanced:true,localSituation:true,positionControls:true,version:'Web案 1.6.3 担当外の注意表示',summary:'担当・通報・活動・資材・CSV・地域集計と、通報取り消し・地図追加・4段階の対応状況を搭載。担当外の通報には注意を表示したまま変更できるWeb案です（Android画面は未実装）。'};
+const assignmentFrame=new ListMapFrame(assignmentConfig,createFrame(assignmentConfig));
+frames.push(assignmentFrame);
+new OperationsDemo(assignmentFrame,{people,refreshAll,feedback:true,fourStage:true,assignmentWarning:true});
+if(['assignment','stages','response','feedback'].includes(query.get('demo'))||['#response-assignment-demo','#response-stages-demo','#response-demo','#response-feedback-demo'].includes(location.hash))requestAnimationFrame(()=>assignmentFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
 
 const visibilityFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll});
 frames.push(visibilityFrame);
-if(['visibility','assignment'].includes(query.get('demo'))||['#response-visibility-demo','#response-assignment-demo'].includes(location.hash))requestAnimationFrame(()=>visibilityFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+if(query.get('demo')==='visibility'||location.hash==='#response-visibility-demo')requestAnimationFrame(()=>visibilityFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
 
 const mapOverviewFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true});
 frames.push(mapOverviewFrame);
