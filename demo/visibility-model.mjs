@@ -1,5 +1,16 @@
-import {STATES,hasPosition} from './clustering.mjs?v=6';
+import {STATES,hasPosition,CENTER} from './clustering.mjs?v=6';
 import {caseCategory,REGIONS,memberName} from './operations-model.mjs?v=4';
+
+const towns=REGIONS.filter(r=>r.depth===2);
+export const TOWN_CENTERS=Object.fromEntries(towns.map((r,i)=>[r.id,[CENTER[0]+(i-1)*.0025,CENTER[1]+.002]]));
+export function viewingScope(viewer){
+  const municipal=viewer.role==='municipal';
+  return {label:municipal?'架空市全域':REGIONS.find(r=>r.id===viewer.regionId)?.name||viewer.regionId,townIds:municipal?towns.map(r=>r.id):[viewer.regionId]};
+}
+export function municipalMapBounds(reports){
+  const points=[...Object.values(TOWN_CENTERS),...reports.filter(r=>!r.personId&&!r.cancelled&&Array.isArray(r.location)&&r.location.length===2&&r.location.every(Number.isFinite)).map(r=>r.location)];
+  return [[Math.min(...points.map(p=>p[0])),Math.min(...points.map(p=>p[1]))],[Math.max(...points.map(p=>p[0])),Math.max(...points.map(p=>p[1]))]];
+}
 
 export function disclosureStart(timing){
   const times=[timing.eewReceivedAt,timing.firstReportedAt].filter(t=>Number.isFinite(t)&&t>=0);

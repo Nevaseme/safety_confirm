@@ -1,6 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectReport,visibilityCsv,safetyStatistics,reportIcon} from './visibility-model.mjs';
+import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectReport,visibilityCsv,safetyStatistics,reportIcon,viewingScope,municipalMapBounds,TOWN_CENTERS} from './visibility-model.mjs';
+
+test('municipal scope covers every town independently of the last selected residential town',()=>{
+  for(const regionId of ['east','central','west']){
+    const scope=viewingScope({role:'municipal',regionId});
+    assert.equal(scope.label,'架空市全域');assert.deepEqual(scope.townIds,['east','central','west']);
+  }
+  assert.deepEqual(viewingScope({role:'resident',regionId:'west'}).townIds,['west']);
+  assert.equal(viewingScope({role:'area',regionId:'east'}).label,'東町内会');
+});
+test('municipal map bounds include all town summaries and public reports without personal safety positions',()=>{
+  const point=[130.9,33.1];
+  const bounds=municipalMapBounds([
+    {location:point},
+    {personId:'private-sos',location:[-170,-70]},
+    {cancelled:true,location:[179,80]},
+    {location:null}
+  ]);
+  for(const [lng,lat] of [...Object.values(TOWN_CENTERS),point]){
+    assert.ok(lng>=bounds[0][0]&&lng<=bounds[1][0]);assert.ok(lat>=bounds[0][1]&&lat<=bounds[1][1]);
+  }
+  assert.ok(bounds[0][0]>120&&bounds[1][0]<140);assert.ok(bounds[0][1]>30&&bounds[1][1]<40);
+});
 
 const viewer={role:'resident',regionId:'east'};
 const timing={eewReceivedAt:1000,firstReportedAt:2000,now:181000};

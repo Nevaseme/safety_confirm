@@ -3,7 +3,7 @@ import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
 import {OperationsDemo} from './operations-demo.mjs?v=4';
-import {mountVisibilityDemo} from './visibility-demo.mjs?v=4';
+import {mountVisibilityDemo} from './visibility-demo.mjs?v=5';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -19,7 +19,7 @@ const config={zoom:query.get('view')==='wide'?14.2:16.8};
 
 function createFrame(config){
   const section=document.createElement('section');section.className='view';
-  section.innerHTML=`<header class="comparison-caption"><h1 class="comparison-label">${escape(config.version)}</h1><p class="comparison-summary">${escape(config.summary)}</p></header><article class="phone ${config.enhanced?'enhanced':''}" id="${config.id}-screen">
+  section.innerHTML=`<header class="comparison-caption"><h1 class="comparison-label">${escape(config.version)}</h1>${config.summary?`<p class="comparison-summary">${escape(config.summary)}</p>`:''}</header><article class="phone ${config.enhanced?'enhanced':''}" id="${config.id}-screen">
   <header class="top"><button class="plain menu" aria-label="メニュー">${icon('list')}</button>${config.enhanced?'<div class="incident-heading"><span class="title">地震発生</span><span class="incident-date">10月21日 14:32 ・ <span data-elapsed>28分前</span></span></div>':'<span class="title">地震発生</span><span class="date">10月21日</span>'}</header>
   <div class="tools"><label class="toggle-label">無事を表示<button class="switch" role="switch" aria-label="無事を表示" aria-checked="true"></button></label><button class="unknown">${icon('user')}位置不明 ${people.filter(p=>!hasPosition(p)).length}人${icon('caret-right')}</button></div>
   <div class="map-area"><div class="map" id="${config.id}-map"></div><div class="loading">地図を読み込んでいます</div>
@@ -341,7 +341,7 @@ class ListMapFrame extends MapFrame{
     });
   }
 }
-const assignmentConfig={id:'response-assignment',zoom:config.zoom,enhanced:true,localSituation:true,positionControls:true,version:'Web案 1.6.3 担当外の注意表示',summary:'担当・通報・活動・資材・CSV・地域集計と、通報取り消し・地図追加・4段階の対応状況を搭載。担当外の通報には注意を表示したまま変更できるWeb案です（Android画面は未実装）。'};
+const assignmentConfig={id:'response-assignment',zoom:config.zoom,enhanced:true,localSituation:true,positionControls:true,version:'ver 1.6.3',summary:''};
 const assignmentFrame=new ListMapFrame(assignmentConfig,createFrame(assignmentConfig));
 frames.push(assignmentFrame);
 new OperationsDemo(assignmentFrame,{people,refreshAll,feedback:true,fourStage:true,assignmentWarning:true});

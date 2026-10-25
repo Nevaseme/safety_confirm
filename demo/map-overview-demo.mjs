@@ -1,13 +1,13 @@
 import {CENTER,hasPosition,STATES} from './clustering.mjs?v=6';
 import {REGIONS} from './operations-model.mjs?v=4';
-import {reportIcon} from './visibility-model.mjs?v=1';
+import {reportIcon,TOWN_CENTERS} from './visibility-model.mjs?v=2';
 import {townSummary,clusterScreenItems} from './map-overview-model.mjs?v=1';
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icon=name=>`<i class="ph-fill ph-${name}" aria-hidden="true"></i>`;
 const labels={sos:'SOS',unanswered:'反応なし',safe:'無事',rescued:'救助済み'};
 const towns=REGIONS.filter(r=>r.depth===2);
-const anchors=Object.fromEntries(towns.map((r,i)=>[r.id,[CENTER[0]+(i-1)*.0025,CENTER[1]+.002]]));
+const anchors=TOWN_CENTERS;
 const pointIcon=row=>{const src=reportIcon(row.urgency);return src?`<img src="${src}" alt="">`:icon('flag');};
 const pointName=p=>p.s==='safe'?'無事の人':p.s==='rescued'?'救助済みの人':p.name;
 const personIcon=p=>`<span class="symbol ${p.s}">${p.s==='sos'?'SOS':p.s==='unanswered'?'?':icon(p.s==='safe'?'check-fat':'user-check')}</span>${p.impact?'<span class="sensor"><img src="assets/impact-collision.svg" alt="衝撃"></span>':''}${p.enclosed?'<span class="sensor enclosed"><img src="assets/enclosed.png" alt="閉所"></span>':''}`;
@@ -22,6 +22,7 @@ export function installMapOverview(frame){
   for(const marker of ops.reportMarkers.values())marker.remove();ops.reportMarkers.clear();
   for(const marker of view.statMarkers.values())marker.remove();view.statMarkers.clear();
   view.drawStatisticsMarkers=()=>{};
+  view.cityButton.remove();
 
   // New-version-only fictional requests make the shortage view testable.
   const request=(id,name,unit,needed,arranged)=>({id,name,unit,needed,arranged,createdBy:'north'});
@@ -48,10 +49,10 @@ export function installMapOverview(frame){
     const center=reports[0]?.location||people[0]?.location||anchors[id];
     map.flyTo({center,zoom:16.8,duration:300});
   }
-  function overview(){
-    frame.closeSheet();frame.showMap();
-    map.fitBounds([[anchors.east[0],CENTER[1]+.001],[anchors.west[0],CENTER[1]+.003]],{padding:{top:80,right:58,bottom:70,left:58},maxZoom:15.9,duration:300});
+  function fitOverview(){
+    map.fitBounds([[anchors.east[0],CENTER[1]+.001],[anchors.west[0],CENTER[1]+.003]],{padding:{top:80,right:56,bottom:70,left:56},maxZoom:15.9,duration:300});
   }
+  function overview(){frame.closeSheet();frame.showMap();fitOverview();}
   function showTown(id){
     selectedTown=id;const item=summary(id);
     openSheet(`<h2>${esc(item.name)}</h2>`,`<dl class="town-safety-counts">${STATES.map(s=>`<div><dt>${labels[s]}</dt><dd>${item.safety[s]}<small>人</small></dd></div>`).join('')}</dl><div class="town-operation-summary"><p class="town-urgent"><span>${icon('warning')}高い緊急度の通報</span><strong>${item.highReports}<small>件</small></strong></p><p class="town-open-note">未対応・対応予定・対応中</p><p class="town-shortage-state">${icon('package')}資材：<strong>${item.needsMaterials?'不足あり':'不足の記録なし'}</strong></p></div><button class="ops-text-button" data-town-zoom>この町内会を拡大</button>`, '<button class="primary blue" data-town-details>詳細を見る</button>');
@@ -75,7 +76,7 @@ export function installMapOverview(frame){
   function render(){
     if(!map.getLayer('preview-building-rating'))return;
     clear();const currentMode=mode();frame.renderedZoom=Math.floor(map.getZoom());frame.phone.dataset.mapMode=currentMode;frame.phone.dataset.zoom=map.getZoom().toFixed(2);
-    controls.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mapMode===currentMode)));
+    controls.querySelectorAll('button').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.mapMode===currentMode));if(b.dataset.mapMode==='town')b.textContent=view.viewer.role==='municipal'?'市全体':'町内会';});
     if(currentMode==='town'){
       const townItems=towns.map(region=>{const at=map.project(anchors[region.id]);return {id:region.id,kind:'town',x:at.x,y:at.y,width:96,height:60};});
       for(const node of clusterScreenItems(townItems)){
@@ -105,9 +106,11 @@ export function installMapOverview(frame){
   controls.querySelector('[data-map-mode=town]').onclick=overview;
   controls.querySelector('[data-map-mode=points]').onclick=()=>focusTown(selectedTown||view.viewer.regionId);
   frame.phone.querySelector('.recenter').onclick=overview;
+  frame.showMunicipalOverview=fitOverview;
   frame.render=render;ops.drawReports=render;
   const originalShowMap=frame.showMap.bind(frame);frame.showMap=()=>{originalShowMap();render();};
   map.on('zoomend',render);map.on('resize',render);
-  if(map.getLayer('preview-building-rating'))overview();else map.on('load',overview);
+  frame.showMap();
+  if(map.getLayer('preview-building-rating'))fitOverview();else map.on('load',fitOverview);
   render();
 }

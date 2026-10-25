@@ -22,3 +22,8 @@
 .visibility-legend .visibility-report-icon{width:30px;height:30px}
 .visibility-version .ops-map-report .visibility-report-icon{width:30px;height:30px}
 .visibility-version .ops-form .visibility-note{margin-inline:0}
+.visibility-city-overview{position:absolute;z-index:4;top:12px;left:12px;min-height:44px;padding:8px 14px;border:1px solid #c9d6e3;border-radius:9px;background:#fff;color:#155eef;font-size:13px;font-weight:700}
+.visibility-city-overview[hidden],.visibility-city-scope[hidden]{display:none}
+.visibility-version.ops-picking .visibility-city-overview{display:none}
+.visibility-city-scope{display:grid;gap:6px;padding:4px 0 14px;font-size:14px}
+.visibility-city-scope>span{font-weight:700}.visibility-city-scope>strong{font-size:16px}.visibility-city-scope>small{color:#536478;font-size:12px}

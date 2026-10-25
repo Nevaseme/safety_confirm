@@ -1,8 +1,8 @@
-import {installMapOverview} from './map-overview-demo.mjs?v=1';
+import {installMapOverview} from './map-overview-demo.mjs?v=2';
 import {OperationsDemo} from './operations-demo.mjs?v=4';
 import {REGIONS,regionName,filterCases,summarizeCases} from './operations-model.mjs?v=4';
-import {STATES,CENTER,NOW,hasPosition,buildIndex} from './clustering.mjs?v=6';
-import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectReport,visibilityCsv,statisticsCsv,safetyStatistics,reportIcon} from './visibility-model.mjs?v=1';
+import {STATES,NOW,hasPosition,buildIndex} from './clustering.mjs?v=6';
+import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectReport,visibilityCsv,statisticsCsv,safetyStatistics,reportIcon,viewingScope,municipalMapBounds,TOWN_CENTERS} from './visibility-model.mjs?v=2';
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icon=name=>`<i class="ph-fill ph-${name}" aria-hidden="true"></i>`;
@@ -87,6 +87,9 @@ class VisibilityController{
     this.clock={eewReceivedAt:NOW,firstReportedAt:NOW+30000};this.elapsed=0;this.startedAt=Date.now();this.statMarkers=new Map();
     const toolbar=document.createElement('div');toolbar.className='visibility-toolbar';toolbar.innerHTML='<button data-view-settings></button><span data-demo-clock></span>';frame.phone.querySelector('.top').after(toolbar);this.toolbar=toolbar;toolbar.querySelector('button').onclick=()=>this.settings();
     frame.phone.classList.add('visibility-version');frame.visibility=this;
+    const cityButton=document.createElement('button');cityButton.className='visibility-city-overview';cityButton.textContent='市全体';cityButton.hidden=true;cityButton.onclick=()=>this.showCityMap();frame.phone.querySelector('.map-area').append(cityButton);this.cityButton=cityButton;
+    const recenter=frame.phone.querySelector('.recenter'),originalRecenter=recenter.onclick;recenter.onclick=()=>this.viewer.role==='municipal'?this.showCityMap():originalRecenter();
+    frame.map.on('load',()=>{if(this.viewer.role==='municipal'&&frame.page==='map')this.showCityMap();});
     this.timer=setInterval(()=>{this.updateToolbar();const ready=this.ready();if(ready!==this.lastReady){this.lastReady=ready;this.apply();}},1000);
   }
   timing(){return {...this.clock,now:NOW+this.elapsed*1000+Date.now()-this.startedAt};}
@@ -94,30 +97,39 @@ class VisibilityController{
   allowed(id){const p=this.rawPeople.find(p=>p.id===id);return p&&canSeePerson(p,this.viewer,this.timing());}
   projectPeople(){return this.rawPeople.map(p=>projectPerson(p,this.viewer,this.timing())).filter(Boolean);}
   refreshPeople(){this.frame.config.people=this.projectPeople();this.frame.index=buildIndex(Supercluster,this.frame.people,this.frame.showSafe);this.frame.revision++;this.frame.render();this.frame.refreshList?.();}
-  updateToolbar(){const sec=Math.max(0,Math.floor((this.timing().now-(disclosureStart(this.clock)??NOW))/1000));this.toolbar.querySelector('button').textContent=`${roles[this.viewer.role]}・${regionName(this.viewer.regionId)} ${icon('caret-down')}`.replace(/<[^>]*>/g,'');this.toolbar.querySelector('[data-demo-clock]').textContent=`経過 ${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;}
+  updateToolbar(){const sec=Math.max(0,Math.floor((this.timing().now-(disclosureStart(this.clock)??NOW))/1000));this.toolbar.querySelector('button').textContent=`${roles[this.viewer.role]}・${viewingScope(this.viewer).label}`;this.toolbar.querySelector('[data-demo-clock]').textContent=`経過 ${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;}
   apply(){
     this.lastReady=this.ready();this.updateToolbar();this.ops?.setRole();this.refreshPeople();
+    this.cityButton.hidden=this.viewer.role!=='municipal';this.frame.phone.querySelector('.recenter').setAttribute('aria-label',this.viewer.role==='municipal'?'市全体を表示':'表示の中心に戻る');
     const unknown=this.frame.people.filter(p=>!hasPosition(p)).length;this.frame.phone.querySelector('.unknown').innerHTML=`${icon('user')}位置不明 ${unknown}人${icon('caret-right')}`;
     this.ops?.render();this.ops?.drawReports();
   }
   statisticsHTML(){return `<section class="visibility-statistics"><h3>町内会別の安否統計</h3><div class="visibility-stat-scroll"><table><thead><tr><th>町内会</th>${STATES.map(s=>`<th>${labels[s]}</th>`).join('')}</tr></thead><tbody>${safetyStatistics(this.rawPeople).map(r=>`<tr><th>${esc(r.name)}</th>${STATES.map(s=>`<td>${r.counts[s]}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;}
+  showCityMap(){
+    if(!this.frame.map.getLayer('preview-building-rating'))return;
+    if(this.frame.showMunicipalOverview){this.frame.showMunicipalOverview();return;}
+    this.frame.map.fitBounds(municipalMapBounds(this.ops?.cases||[]),{padding:{top:150,bottom:90,left:64,right:64},maxZoom:15.9,duration:300});
+  }
   denied(){this.frame.openSheet('<h2>安否の統計</h2>',this.statisticsHTML()+'<p class="visibility-note">この立場・町内会・時間では、個人の詳細を表示しません。</p>');}
   settings(){
     const elapsed=Math.floor((this.timing().now-NOW)/1000);
-    this.ops.form('表示条件を試す',`<p class="visibility-note">架空データの表示確認用です。</p><label class="ops-field">表示する立場<select name="viewer-role">${opts(Object.entries(roles),this.viewer.role)}</select></label><label class="ops-field">所属・担当する町内会<select name="viewer-region">${opts(leaves.map(r=>[r.id,r.name]),this.viewer.regionId)}</select></label><label class="ops-field">経過時間<select name="demo-elapsed">${opts([[0,'開始直後'],[179,'2分59秒'],[180,'3分00秒'],[240,'4分後']],elapsed<179?0:elapsed<180?179:elapsed<240?180:240)}</select></label><label class="ops-field">最初のきっかけ<select name="trigger">${opts([['eew','速報を受信 → 30秒後に最初の地震報告'],['report','最初の地震報告 → 30秒後に速報'],['eew-only','速報だけ'],['report-only','地震報告だけ']],this.scenario||'eew')}</select></label><p class="visibility-note">3分間は反応なしの個人情報を表示しません。3分後も、他の町内会・自治体職員には安否の統計だけを表示します。</p><button type="button" class="ops-text-button" data-later-trigger>追加の速報・地震報告を受ける</button>`,data=>{
-      this.viewer={role:data.get('viewer-role'),regionId:data.get('viewer-region')};this.scenario=data.get('trigger');
+    this.ops.form('表示条件を試す',`<p class="visibility-note">架空データの表示確認用です。</p><label class="ops-field">表示する立場<select name="viewer-role">${opts(Object.entries(roles),this.viewer.role)}</select></label><div data-resident-region><label class="ops-field">所属・担当する町内会<select name="viewer-region">${opts(leaves.map(r=>[r.id,r.name]),this.viewer.regionId)}</select></label></div><div class="visibility-city-scope" data-city-scope hidden><span>表示範囲</span><strong>架空市全域</strong><small>東町内会・中央町内会・西町内会</small></div><label class="ops-field">経過時間<select name="demo-elapsed">${opts([[0,'開始直後'],[179,'2分59秒'],[180,'3分00秒'],[240,'4分後']],elapsed<179?0:elapsed<180?179:elapsed<240?180:240)}</select></label><label class="ops-field">最初のきっかけ<select name="trigger">${opts([['eew','速報を受信 → 30秒後に最初の地震報告'],['report','最初の地震報告 → 30秒後に速報'],['eew-only','速報だけ'],['report-only','地震報告だけ']],this.scenario||'eew')}</select></label><p class="visibility-note">3分間は反応なしの個人情報を表示しません。3分後も、他の町内会・自治体職員には安否の統計だけを表示します。</p><button type="button" class="ops-text-button" data-later-trigger>追加の速報・地震報告を受ける</button>`,data=>{
+      this.viewer={role:data.get('viewer-role'),regionId:data.get('viewer-region')||this.viewer.regionId};this.scenario=data.get('trigger');
       this.clock={eewReceivedAt:this.scenario==='report-only'?null:NOW+(this.scenario==='report'?30000:0),firstReportedAt:this.scenario==='eew-only'?null:NOW+(this.scenario==='eew'?30000:0)};
-      this.elapsed=Number(data.get('demo-elapsed'));this.startedAt=Date.now();this.frame.closeSheet();this.apply();
+      this.elapsed=Number(data.get('demo-elapsed'));this.startedAt=Date.now();this.frame.closeSheet();this.apply();if(this.viewer.role==='municipal'&&this.frame.page==='map')this.showCityMap();
     },'表示を切り替える');
     this.frame.body.querySelector('[data-later-trigger]').onclick=()=>{const at=this.timing().now;recordTrigger(this.clock,'eewReceivedAt',at);recordTrigger(this.clock,'firstReportedAt',at);this.frame.toast('追加分を受信しました。3分の起点は変わりません。');};
+    const role=this.frame.body.querySelector('[name=viewer-role]'),region=this.frame.body.querySelector('[name=viewer-region]');
+    const updateScope=()=>{const municipal=role.value==='municipal';this.frame.body.querySelector('[data-resident-region]').hidden=municipal;region.disabled=municipal;this.frame.body.querySelector('[data-city-scope]').hidden=!municipal;};
+    role.onchange=updateScope;updateScope();
   }
   drawStatisticsMarkers(){
     if(!this.frame.map.getLayer('preview-building-rating'))return;
     const stats=safetyStatistics(this.rawPeople),wanted=new Set();
-    for(const [i,region] of stats.entries()){
+    for(const region of stats){
       const hidden=this.rawPeople.filter(p=>p.regionId===region.regionId&&!this.allowed(p.id)&&(this.frame.showSafe||!['safe','rescued'].includes(p.s)));if(!hidden.length)continue;wanted.add(region.regionId);
       let marker=this.statMarkers.get(region.regionId);
-      if(!marker){const button=document.createElement('button');button.className='visibility-stat-marker';button.onclick=()=>this.denied();marker=new maplibregl.Marker({element:button,anchor:'bottom'}).setLngLat([CENTER[0]+(i-1)*.0025,CENTER[1]+.002]).addTo(this.frame.map);this.statMarkers.set(region.regionId,marker);}
+      if(!marker){const button=document.createElement('button');button.className='visibility-stat-marker';button.onclick=event=>{event.stopPropagation();this.denied();};marker=new maplibregl.Marker({element:button,anchor:'bottom'}).setLngLat(TOWN_CENTERS[region.regionId]).addTo(this.frame.map);this.statMarkers.set(region.regionId,marker);}
       const counts=STATES.map(s=>hidden.filter(p=>p.s===s).length),button=marker.getElement();button.innerHTML=`<strong>${esc(region.name)}</strong>${STATES.map((s,j)=>counts[j]?`<span>${labels[s]} ${counts[j]}人</span>`:'').join('')}`;button.setAttribute('aria-label',`${region.name}の安否統計・個人情報非表示`);
     }
     for(const [id,marker] of this.statMarkers)if(!wanted.has(id)){marker.remove();this.statMarkers.delete(id);}
@@ -126,6 +138,7 @@ class VisibilityController{
 
 export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false}){
   class VisibilityFrame extends ListMapFrame{
+    showMap(){const entering=this.page!=='map';super.showMap();if(entering&&this.visibility?.viewer.role==='municipal')this.visibility.showCityMap();}
     personById(id){return id==='p5'&&this.visibility?this.visibility.rawPeople.find(p=>p.id===id):super.personById(id);}
     refreshSource(){if(this.visibility)this.config.people=this.visibility.projectPeople();}
     render(){super.render();this.visibility?.drawStatisticsMarkers();}
@@ -157,8 +170,8 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
     }
     showLegend(){super.showLegend();this.body.insertAdjacentHTML('beforeend',`<h3>通報の緊急度</h3>${['高','中','低','未設定'].map(urgency=>`<div class="legend-row visibility-legend">${reportSymbol({urgency})}<span>${urgency==='未設定'?'未設定（判定前）':'緊急度 '+urgency}</span></div>`).join('')}`);}
   }
-  const config={id:'response-visibility',zoom,enhanced:true,localSituation:true,positionControls:true,people:[],homes:structuredClone(homes),version:'Web案 1.6.4 公開範囲・通報アイコン',summary:'地域・立場ごとの公開範囲と、反応なしの3分待機・通報の緊急度アイコンを追加。架空データで表示を試すWeb案です（Android・実データの権限制御は未実装）。'};
-  if(overview)Object.assign(config,{id:'response-map',zoom:15.2,version:'Web案 1.6.5 町内会の要約と地図整理',summary:'町内会の要約に未完了の高緊急通報と資材不足の有無を追加。詳細で品目・不足数を確認でき、個別位置では近接するSOSと通報をまとめたWeb案です（Android未反映）。'});
+  const config={id:'response-visibility',zoom,enhanced:true,localSituation:true,positionControls:true,people:[],homes:structuredClone(homes),version:'ver 1.6.4',summary:'地域ごとの公開範囲設定と通報のアイコンを追加'};
+  if(overview)Object.assign(config,{id:'response-map',zoom:15.2,version:'ver 1.6.5',summary:'ver 1.6.4の別案'});
   const frame=new VisibilityFrame(config,createFrame(config)),visibility=new VisibilityController(frame,people,config.homes);
   new VisibilityOperations(frame,visibility,refreshAll);visibility.apply();if(overview)installMapOverview(frame);return frame;
 }
