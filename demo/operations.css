@@ -98,3 +98,4 @@
 .ops-picking .maplibregl-marker{pointer-events:none}
 .ops-picking .maplibregl-canvas{cursor:crosshair}
 .ops-selected-point{padding:12px 0;font-size:13px!important;color:#536478}
+.sheet-head .ops-assignment-warning{margin:10px 0 0;padding:10px 12px;border-left:3px solid #b77910;border-radius:0 6px 6px 0;background:#fff8e8;color:#744510;font-size:14px;font-weight:650;line-height:1.6}

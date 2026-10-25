@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CATEGORIES,REGIONS,seedCases,filterCases,summarizeCases,caseCategory,casesCsv,saveMaterial,cancelReport,restoreReport,workSummary,updateWorkProgress,startWork} from './operations-model.mjs';
+import {CATEGORIES,REGIONS,seedCases,filterCases,summarizeCases,caseCategory,casesCsv,saveMaterial,cancelReport,restoreReport,workSummary,updateWorkProgress,startWork,isAssignedToOthers} from './operations-model.mjs';
 
 const sample=[
   {id:'a',category:'SOS',regionIds:['east','east-ward'],assignees:[]},
@@ -121,4 +121,21 @@ test('new fixtures show all four stages while previous comparisons retain three 
   const row=rows.find(r=>r.status==='対応予定');
   cancelReport(row,'重複');restoreReport(row);
   assert.equal(row.status,'対応予定');
+});
+
+test('non-assignee notice follows current assignment and permits progress updates',()=>{
+  assert.equal(isAssignedToOthers({assignees:[]}),false);
+  assert.equal(isAssignedToOthers({assignees:['self']}),false);
+  assert.equal(isAssignedToOthers({assignees:['north','self']}),false);
+  const row={assignees:['north','contact'],status:'対応予定'};
+  assert.equal(isAssignedToOthers(row),true);
+  updateWorkProgress(row,'対応中','現地を確認');
+  assert.equal(row.status,'対応中');
+  assert.deepEqual(row.assignees,['north','contact']);
+  startWork(row);
+  assert.equal(isAssignedToOthers(row),false);
+  row.assignees=row.assignees.filter(id=>id!=='self');
+  assert.equal(isAssignedToOthers(row),true);
+  row.assignees=[];
+  assert.equal(isAssignedToOthers(row),false);
 });

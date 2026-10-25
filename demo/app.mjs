@@ -2,7 +2,7 @@ import {STATES,CENTER,NOW,CLUSTER_END_ZOOM,hasPosition,buildIndex,getNodes,displ
 import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
-import {OperationsDemo} from './operations-demo.mjs?v=3';
+import {OperationsDemo} from './operations-demo.mjs?v=4';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -354,3 +354,9 @@ const stagesFrame=new ListMapFrame(stagesConfig,createFrame(stagesConfig));
 frames.push(stagesFrame);
 new OperationsDemo(stagesFrame,{people,refreshAll,feedback:true,fourStage:true});
 if(query.get('demo')==='stages'||location.hash==='#response-stages-demo')requestAnimationFrame(()=>stagesFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+
+const assignmentConfig={id:'response-assignment',zoom:config.zoom,enhanced:true,localSituation:true,positionControls:true,version:'Web案 1.6.3 担当外の注意表示',summary:'他の担当者が付いていて自分が担当していない通報の詳細・変更画面に注意を表示。注意を表示したまま変更できるWeb案です（Android画面は未実装）。'};
+const assignmentFrame=new ListMapFrame(assignmentConfig,createFrame(assignmentConfig));
+frames.push(assignmentFrame);
+new OperationsDemo(assignmentFrame,{people,refreshAll,feedback:true,fourStage:true,assignmentWarning:true});
+if(query.get('demo')==='assignment'||location.hash==='#response-assignment-demo')requestAnimationFrame(()=>assignmentFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));

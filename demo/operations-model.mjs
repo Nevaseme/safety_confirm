@@ -1,6 +1,7 @@
 // Browser-memory fixtures for the public demo; no Android records or live services.
 export const CATEGORIES=['SOS','道路閉塞','建物倒壊','その他'];
 export const WORK_STATUSES=['未対応','対応予定','対応中','対応済み'];
+export const isAssignedToOthers=row=>row.assignees.length>0&&!row.assignees.includes('self');
 export function updateWorkProgress(row,status,result=''){
   if(!WORK_STATUSES.includes(status))throw Error('対応状況を選択してください');
   const text=result.trim();
