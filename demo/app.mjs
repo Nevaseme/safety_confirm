@@ -2,7 +2,7 @@ import {STATES,CENTER,NOW,CLUSTER_END_ZOOM,hasPosition,buildIndex,getNodes,displ
 import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
-import {OperationsDemo} from './operations-demo.mjs?v=2';
+import {OperationsDemo} from './operations-demo.mjs?v=3';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -338,8 +338,6 @@ class ListMapFrame extends MapFrame{
 }
 const latestConfig={id:'latest',zoom:config.zoom,enhanced:true,localSituation:true,version:'1.5.4 反映案',summary:'地図・一覧・安否の画面見本。今回の追加：SOSメモの500文字制限と「メモだけ保存」。'};
 frames.push(new ListMapFrame(latestConfig,createFrame(latestConfig)));
-const positionConfig={id:'position',zoom:config.zoom,enhanced:true,localSituation:true,positionControls:true,version:'1.5.5 位置記録',summary:'メニューに位置記録の開始・停止・再取得を追加。Webでは架空の位置で操作できます。'};
-frames.push(new ListMapFrame(positionConfig,createFrame(positionConfig)));
 const responseConfig={id:'response',zoom:config.zoom,enhanced:true,localSituation:true,positionControls:true,version:'Web案 1.6.0 対応・地域集計',summary:'担当・通報・活動・資材・CSVと、地域別の総数／SOS・道路閉塞・建物倒壊・その他の集計を追加。架空データの操作デモで、Androidの画面は未実装です。'};
 const responseFrame=new ListMapFrame(responseConfig,createFrame(responseConfig));
 frames.push(responseFrame);
@@ -350,3 +348,9 @@ frames.push(feedbackFrame);
 new OperationsDemo(feedbackFrame,{people,refreshAll,feedback:true});
 if(query.get('demo')==='response'||location.hash==='#response-demo')requestAnimationFrame(()=>responseFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
 if(query.get('demo')==='feedback'||location.hash==='#response-feedback-demo')requestAnimationFrame(()=>feedbackFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+
+const stagesConfig={id:'response-stages',zoom:config.zoom,enhanced:true,localSituation:true,positionControls:true,version:'Web案 1.6.2 対応状況を4段階に',summary:'未対応・対応予定・対応中・対応済みの4段階に変更。1.6.1の操作改善を引き継いだ架空データのWeb案です（Android画面は未実装）。'};
+const stagesFrame=new ListMapFrame(stagesConfig,createFrame(stagesConfig));
+frames.push(stagesFrame);
+new OperationsDemo(stagesFrame,{people,refreshAll,feedback:true,fourStage:true});
+if(query.get('demo')==='stages'||location.hash==='#response-stages-demo')requestAnimationFrame(()=>stagesFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));

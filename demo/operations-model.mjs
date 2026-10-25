@@ -1,5 +1,16 @@
 // Browser-memory fixtures for the public demo; no Android records or live services.
 export const CATEGORIES=['SOS','道路閉塞','建物倒壊','その他'];
+export const WORK_STATUSES=['未対応','対応予定','対応中','対応済み'];
+export function updateWorkProgress(row,status,result=''){
+  if(!WORK_STATUSES.includes(status))throw Error('対応状況を選択してください');
+  const text=result.trim();
+  if(status==='対応済み'&&!text)throw Error('対応済みにする場合は結果を入力してください');
+  row.status=status;row.result=text;
+}
+export function startWork(row){
+  if(!row.assignees.includes('self'))row.assignees.push('self');
+  if(['未対応','対応予定'].includes(row.status))row.status='対応中';
+}
 export const REGIONS=[
   {id:'city',name:'架空市',parentId:null,depth:0},
   {id:'east-ward',name:'東区',parentId:'city',depth:1},
@@ -23,7 +34,7 @@ export function restoreReport(row){
   row.cancelled=false;row.updatedAt='10月26日 15:00';
   (row.history??=[]).push({text:'通報の取り消しを戻す',author:'自分',at:row.updatedAt});
 }
-export function seedCases(people){
+export function seedCases(people,{fourStage=false}={}){
   const common={status:'未対応',result:'',urgency:'未設定',reason:'',createdBy:'north',updatedAt:'10月26日 14:45'};
   const sos=people.filter(p=>p.s==='sos').map((p,i)=>({...common,id:`sos-${p.id}`,personId:p.id,title:p.name||'SOSの人',description:p.memo||'助けを求めています。',category:'SOS',regionIds:[['east','central','west'][i%3]],assignees:i===0?[]:i===2?['self']:['north'],status:i===2?'対応中':'未対応',urgency:i===0?'高':'未設定',reason:i===0?'けがにより移動が困難':'',materials:[],history:[]}));
   const reports=[
@@ -32,7 +43,13 @@ export function seedCases(people){
     {id:'road-2',category:'道路閉塞',title:'道路閉塞',description:'西町の交差点。ブロック塀が道路を塞いでいます。',regionIds:['west'],assignees:['contact']},
     {id:'other-1',category:'断水',title:'断水',description:'集会所の水道が使えません。',regionIds:['west'],assignees:['contact']}
   ].map(r=>({...common,...r,materials:[],history:[]}));
-  return [...sos,...reports];
+  const rows=[...sos,...reports];
+  if(fourStage){
+    for(const row of rows)if(row.status==='未対応'&&row.assignees.length)row.status='対応予定';
+    const road=rows.find(r=>r.id==='road-2');road.status='対応中';
+    const other=rows.find(r=>r.id==='other-1');other.status='対応済み';other.result='集会所の給水を再開し、利用できることを確認しました。';
+  }
+  return rows;
 }
 export function filterCases(rows,filter='all',member='self'){
   return rows.filter(r=>!r.cancelled).filter(r=>filter==='none'?r.assignees.length===0:filter==='mine'?r.assignees.includes(member):true);

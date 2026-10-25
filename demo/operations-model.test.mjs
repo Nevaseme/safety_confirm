@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CATEGORIES,REGIONS,seedCases,filterCases,summarizeCases,caseCategory,casesCsv,saveMaterial,cancelReport,restoreReport,workSummary} from './operations-model.mjs';
+import {CATEGORIES,REGIONS,seedCases,filterCases,summarizeCases,caseCategory,casesCsv,saveMaterial,cancelReport,restoreReport,workSummary,updateWorkProgress,startWork} from './operations-model.mjs';
 
 const sample=[
   {id:'a',category:'SOS',regionIds:['east','east-ward'],assignees:[]},
@@ -85,4 +85,40 @@ test('work status and assigned team have distinct labels',()=>{
   assert.deepEqual(workSummary({status:'未対応',assignees:['north']}),{status:'未対応',assignment:'担当：北班'});
   assert.deepEqual(workSummary({status:'対応中',assignees:['self','north']}),{status:'対応中',assignment:'担当：自分・北班'});
   assert.deepEqual(workSummary({status:'未対応',assignees:[]}),{status:'未対応',assignment:'担当者無し'});
+});
+
+test('four-stage progress survives CSV export without changing category totals or assignment',()=>{
+  const rows=seedCases([]);const row=rows.find(r=>r.id==='building-1');
+  const before=summarizeCases(rows);
+  for(const status of ['未対応','対応予定','対応中','対応済み']){
+    updateWorkProgress(row,status,status==='対応済み'?'現地確認と必要な措置を完了':'');
+    assert.equal(workSummary(row).status,status);
+    assert.ok(casesCsv(rows).includes('"'+status+'"'));
+    assert.deepEqual(summarizeCases(rows),before);
+    assert.deepEqual(row.assignees,['north']);
+  }
+  assert.throws(()=>updateWorkProgress(row,'対応済み',''),/結果/);
+  assert.throws(()=>updateWorkProgress(row,'未知の状態',''),/対応状況/);
+  assert.equal(row.status,'対応済み');
+  updateWorkProgress(row,'未対応','再確認が必要');
+  assert.equal(row.status,'未対応');
+});
+
+test('starting planned work adds self once and marks it in progress',()=>{
+  const row={status:'対応予定',assignees:['north']};
+  startWork(row);startWork(row);
+  assert.equal(row.status,'対応中');
+  assert.deepEqual(row.assignees,['north','self']);
+  const assigned={status:'対応予定',assignees:['self']};startWork(assigned);
+  assert.equal(assigned.status,'対応中');assert.deepEqual(assigned.assignees,['self']);
+});
+
+test('new fixtures show all four stages while previous comparisons retain three stages',()=>{
+  const rows=seedCases([],{fourStage:true});
+  assert.deepEqual(new Set(rows.map(r=>r.status)),new Set(['未対応','対応予定','対応中','対応済み']));
+  assert.ok(rows.filter(r=>r.status==='対応済み').every(r=>r.result));
+  assert.ok(!seedCases([]).some(r=>r.status==='対応予定'));
+  const row=rows.find(r=>r.status==='対応予定');
+  cancelReport(row,'重複');restoreReport(row);
+  assert.equal(row.status,'対応予定');
 });
