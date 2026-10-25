@@ -39,6 +39,8 @@
 
 ## 残る確認
 
-公開URLでの同版表示と操作。Androidの画面、実データ保存、端末間同期の検証は今回のWebデモに含まない。
+公開コード `b10078c` の[公開URL](https://nevaseme.github.io/safety_confirm/?demo=response#response-demo)で同版表示、4分類、地域・種類のドリルダウン、通報追加による総数9→10・その他1→2・東町内会3→4・東区6→7を確認。公開先のコンソールerrorは0件。公開画面の証拠は比較画像と同じフォルダーの `response-public-summary.png`。
+
+Androidの画面、実データ保存、端末間同期の検証は今回のWebデモに含まない。
 
 final result: passed
