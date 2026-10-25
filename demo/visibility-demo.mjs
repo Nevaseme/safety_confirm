@@ -108,7 +108,7 @@ class VisibilityController{
   showCityMap(){
     if(!this.frame.map.getLayer('preview-building-rating'))return;
     if(this.frame.showMunicipalOverview){this.frame.showMunicipalOverview();return;}
-    this.frame.map.fitBounds(municipalMapBounds(this.ops?.cases||[]),{padding:{top:150,bottom:90,left:64,right:64},maxZoom:15.9,duration:300});
+    this.frame.map.fitBounds(municipalMapBounds(this.ops?.cases||[]),{padding:{top:220,bottom:60,left:64,right:64},maxZoom:15.9,duration:300});
   }
   denied(){this.frame.openSheet('<h2>安否の統計</h2>',this.statisticsHTML()+'<p class="visibility-note">この立場・町内会・時間では、個人の詳細を表示しません。</p>');}
   settings(){
