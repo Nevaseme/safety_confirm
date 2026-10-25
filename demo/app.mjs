@@ -3,6 +3,7 @@ import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
 import {OperationsDemo} from './operations-demo.mjs?v=4';
+import {mountVisibilityDemo} from './visibility-demo.mjs?v=1';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -31,11 +32,15 @@ function createFrame(config){
   document.querySelector('#board').append(section);
   return section.querySelector('.phone');
 }
-function refreshAll(){for(const frame of frames){frame.index=buildIndex(Supercluster,people,frame.showSafe);frame.revision++;frame.render();frame.refreshList?.();}}
+function refreshAll(){for(const frame of frames){frame.refreshSource?.();frame.index=buildIndex(Supercluster,frame.people,frame.showSafe);frame.revision++;frame.render();frame.refreshList?.();}}
 
 class MapFrame{
+  get people(){return this.config.people||people;}
+  get homes(){return this.config.homes||homes;}
+  personById(id){return this.people.find(p=>p.id===id);}
+  homeById(id){return this.homes.find(h=>h.id===id);}
   constructor(config,phone){
-    this.config=config;this.phone=phone;this.showSafe=true;this.index=buildIndex(Supercluster,people);this.markers=new Map();this.revision=0;this.selected=null;
+    this.config=config;this.phone=phone;this.showSafe=true;this.index=buildIndex(Supercluster,this.people);this.markers=new Map();this.revision=0;this.selected=null;
     this.sheet=phone.querySelector('.sheet');this.head=phone.querySelector('.sheet-head');this.body=phone.querySelector('.sheet-body');this.footer=phone.querySelector('.sheet-footer');
     this.map=new maplibregl.Map({container:config.id+'-map',style:'https://tiles.openfreemap.org/styles/positron',center:CENTER,zoom:config.zoom,maxZoom:21,pitch:0,bearing:0,dragRotate:false,attributionControl:false,locale:{'NavigationControl.ZoomIn':'拡大','NavigationControl.ZoomOut':'縮小'}});
     this.map.addControl(new maplibregl.AttributionControl({compact:false}),'bottom-right');
@@ -46,7 +51,7 @@ class MapFrame{
     this.map.on('zoom',()=>{if(Math.floor(this.map.getZoom())!==this.renderedZoom&&!this.pendingFrame){this.pendingFrame=requestAnimationFrame(()=>{this.pendingFrame=null;this.render();});}});
     this.map.on('moveend',()=>this.render());
     this.map.on('click',event=>this.selectBuilding(event));
-    phone.querySelector('.switch').onclick=event=>{this.showSafe=!this.showSafe;event.currentTarget.setAttribute('aria-checked',String(this.showSafe));this.index=buildIndex(Supercluster,people,this.showSafe);this.revision++;this.render();};
+    phone.querySelector('.switch').onclick=event=>{this.showSafe=!this.showSafe;event.currentTarget.setAttribute('aria-checked',String(this.showSafe));this.index=buildIndex(Supercluster,this.people,this.showSafe);this.revision++;this.render();};
     phone.querySelector('.legend-trigger').onclick=()=>this.showLegend();
     phone.querySelector('.unknown').onclick=()=>this.showUnknown();
     phone.querySelector('.menu').onclick=()=>this.showMenu();
@@ -69,7 +74,7 @@ class MapFrame{
     const b=this.map.getBounds(),z=this.map.getZoom();this.renderedZoom=Math.floor(z);
     const nodes=getNodes(this.index,[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()],z),shown=new Set();let clusters=0,singles=0;
     for(const feature of nodes){
-      const props=feature.properties,isCluster=Boolean(props.cluster),p=isCluster?null:personById(props.personId),bubble=isCluster||z<CLUSTER_END_ZOOM;
+      const props=feature.properties,isCluster=Boolean(props.cluster),p=isCluster?null:this.personById(props.personId),bubble=isCluster||z<CLUSTER_END_ZOOM;
       const key=isCluster?`cluster-${props.cluster_id}`:`person-${props.personId}`;shown.add(key);
       const counts=displayCounts(feature),leaves=isCluster?this.index.getLeaves(props.cluster_id,Infinity):[feature];
       const members=leaves.map(f=>f.properties.personId).join(',');
@@ -107,12 +112,12 @@ class MapFrame{
     this.phone.dataset.visiblePopulation=String(nodes.reduce((n,f)=>n+(f.properties.point_count||1),0));
   }
   openMapPerson(p){
-    const samePosition=people.filter(other=>hasPosition(other)&&(this.showSafe||!['safe','rescued'].includes(other.s))&&other.location.every((coordinate,i)=>coordinate===p.location[i]));
+    const samePosition=this.people.filter(other=>hasPosition(other)&&(this.showSafe||!['safe','rescued'].includes(other.s))&&other.location.every((coordinate,i)=>coordinate===p.location[i]));
     if(samePosition.length>1)this.showPeople(samePosition);else this.openPerson(p);
   }
   openPerson(p){
     this.selected=p.id;this.render();
-    const home=homeById(p.homeId),needsHelp=['sos','unanswered'].includes(p.s);
+    const home=this.homeById(p.homeId),needsHelp=['sos','unanswered'].includes(p.s);
     let location=hasPosition(p)?`${time(p.acquiredAt)}取得・${age(p)}・精度 約${p.accuracy}m`:'未受信';
     const title=`<div class="person-title">${symbol(p.s)}<div><h2>${escape(personLabel(p))}</h2><div class="person-state ${p.s}">${stateText(p)}${p.s==='sos'?`・${p.answeredAt}の回答`:''}</div></div></div><p class="location-line">${icon('map-pin')}最後のスマホ位置　${location}</p>`;
     let body=p.s==='sos'&&p.memo?`<h3>SOSメモ</h3><p class="sos-note">${escape(p.memo)}</p>`:'';
@@ -138,14 +143,14 @@ class MapFrame{
     this.footer.querySelector('[data-action=correct-save]').onclick=()=>{p.s=p.priorSafety||'sos';p.history.push({time:'15:00',author:'自分',text:this.body.querySelector('textarea').value.trim()||'救助済みの記録を取り消し。',action:'救助記録の訂正'});refreshAll();this.openPerson(p);this.toast('訂正を記録しました');};
   }
   showPeople(list,title='この場所にいる人'){
-    this.openSheet(`<h2>${title}</h2>`,list.map(p=>`<button class="person-row" data-id="${p.id}">${symbol(p.s)}<span class="row-content"><strong>${escape(personLabel(p))}</strong><small>${hasPosition(p)?`${stateText(p)}・位置 ${age(p)}`:`普段の住居：${escape(homeById(p.homeId).name)}<br>寝室：${escape(p.bedroom)}`}</small></span>${icon('caret-right')}</button>`).join(''));
-    this.body.querySelectorAll('[data-id]').forEach(button=>button.onclick=()=>this.openPerson(personById(button.dataset.id)));
+    this.openSheet(`<h2>${title}</h2>`,list.map(p=>`<button class="person-row" data-id="${p.id}">${symbol(p.s)}<span class="row-content"><strong>${escape(personLabel(p))}</strong><small>${hasPosition(p)?`${stateText(p)}・位置 ${age(p)}`:`普段の住居：${escape(this.homeById(p.homeId).name)}<br>寝室：${escape(p.bedroom)}`}</small></span>${icon('caret-right')}</button>`).join(''));
+    this.body.querySelectorAll('[data-id]').forEach(button=>button.onclick=()=>this.openPerson(this.personById(button.dataset.id)));
   }
-  showUnknown(){const unknown=people.filter(p=>!hasPosition(p));this.showPeople(unknown,`位置不明 ${unknown.length}人`);}
+  showUnknown(){const unknown=this.people.filter(p=>!hasPosition(p));this.showPeople(unknown,`位置不明 ${unknown.length}人`);}
   showHome(home,backPerson=null){
-    const linked=people.filter(p=>p.homeId===home.id),body=`<div class="attrs"><span><small>建築年</small>${home.built}年</span><span><small>建材・構造</small>${home.material}</span><span><small>階数</small>${home.floors}階建</span></div><h3>この建物の登録住民 ${linked.length}人</h3>${linked.map(p=>`<button class="person-row" data-id="${p.id}">${symbol(p.s)}<span class="row-content"><strong>${personLabel(p)}</strong><small>${stateText(p)}・${hasPosition(p)?`最後の位置 ${age(p)}`:'位置不明'}</small></span>${icon('caret-right')}</button>`).join('')}`;
+    const linked=this.people.filter(p=>p.homeId===home.id),body=`<div class="attrs"><span><small>建築年</small>${home.built}年</span><span><small>建材・構造</small>${home.material}</span><span><small>階数</small>${home.floors}階建</span></div><h3>この建物の登録住民 ${linked.length}人</h3>${linked.map(p=>`<button class="person-row" data-id="${p.id}">${symbol(p.s)}<span class="row-content"><strong>${personLabel(p)}</strong><small>${stateText(p)}・${hasPosition(p)?`最後の位置 ${age(p)}`:'位置不明'}</small></span>${icon('caret-right')}</button>`).join('')}`;
     this.openSheet(`<h2>${home.name}</h2>`,body,backPerson?'<button class="secondary full" data-action="back">人の詳細へ戻る</button>':'');
-    this.body.querySelectorAll('[data-id]').forEach(button=>button.onclick=()=>{const p=personById(button.dataset.id);if(hasPosition(p))this.map.flyTo({center:p.location,zoom:17});this.openPerson(p);});
+    this.body.querySelectorAll('[data-id]').forEach(button=>button.onclick=()=>{const p=this.personById(button.dataset.id);if(hasPosition(p))this.map.flyTo({center:p.location,zoom:17});this.openPerson(p);});
     this.footer.querySelector('[data-action=back]')?.addEventListener('click',()=>this.openPerson(backPerson));
   }
   selectBuilding(event){
@@ -153,18 +158,18 @@ class MapFrame{
     const feature=this.map.queryRenderedFeatures(event.point,{layers:['preview-building-rating']})[0];if(!feature)return;
     const coords=feature.geometry.type==='Polygon'?feature.geometry.coordinates[0]:feature.geometry.coordinates[0][0];
     const center=coords.reduce((sum,c)=>[sum[0]+c[0]/coords.length,sum[1]+c[1]/coords.length],[0,0]);
-    const home=homes.find(h=>Math.hypot((center[0]-h.location[0])*.84,center[1]-h.location[1])<.00035);
+    const home=this.homes.find(h=>Math.hypot((center[0]-h.location[0])*.84,center[1]-h.location[1])<.00035);
     const rating=previewBuildingRating(feature.id);
     if(home)this.showHome(home);else this.openSheet('<h2>建物の詳細</h2>',`<h3>建物の強さ</h3><div class="legend-row"><span class="patch" style="background:${['#FBE8C5','#F2AE5D','#C5672E','#d9dde2'][rating]}"></span>${['強い側','中間','弱い側','不明'][rating]}</div><h3>登録住民</h3><p>この建物にはまだ住民の登録がありません。</p>`);
   }
   showLegend(){
     this.openSheet('<h2>凡例</h2>',`<h3>スマホの安否</h3>${STATES.map(s=>`<div class="legend-row">${symbol(s)}${labels[s]}</div>`).join('')}<h3>スマホの観測</h3><div class="legend-sensors"><div>${sensor('impact',true)}衝撃</div><div>${sensor('enclosed',true)}閉所</div></div><h3>建物の強さ</h3>${['強い側','中間','弱い側','不明'].map((label,i)=>`<div class="legend-row"><span class="patch ${i===3?'legend-unknown':''}" style="${i<3?'background:'+['#FBE8C5','#F2AE5D','#C5672E'][i]:''}"></span>${label}</div>`).join('')}`);
   }
-  showMenu(){this.openSheet('<h2>メニュー</h2>',`<button class="person-row" data-menu="home">${icon('house')}<span class="row-content"><strong>自分の住居・寝室</strong></span>${icon('caret-right')}</button><button class="person-row" data-menu="group">${icon('users')}<span class="row-content"><strong>グループ</strong><small>木山地区</small></span>${icon('caret-right')}</button><button class="person-row" data-menu="map">${icon('download-simple')}<span class="row-content"><strong>地図を保存</strong></span>${icon('caret-right')}</button><button class="person-row" data-menu="settings">${icon('gear-six')}<span class="row-content"><strong>設定</strong></span>${icon('caret-right')}</button>`);this.body.querySelectorAll('[data-menu]').forEach(b=>b.onclick=()=>b.dataset.menu==='home'?this.showHome(homeById('sato')):this.toast('このプレビューでは地図と詳細を確認できます'));}
+  showMenu(){this.openSheet('<h2>メニュー</h2>',`<button class="person-row" data-menu="home">${icon('house')}<span class="row-content"><strong>自分の住居・寝室</strong></span>${icon('caret-right')}</button><button class="person-row" data-menu="group">${icon('users')}<span class="row-content"><strong>グループ</strong><small>木山地区</small></span>${icon('caret-right')}</button><button class="person-row" data-menu="map">${icon('download-simple')}<span class="row-content"><strong>地図を保存</strong></span>${icon('caret-right')}</button><button class="person-row" data-menu="settings">${icon('gear-six')}<span class="row-content"><strong>設定</strong></span>${icon('caret-right')}</button>`);this.body.querySelectorAll('[data-menu]').forEach(b=>b.onclick=()=>b.dataset.menu==='home'?this.showHome(this.homeById('sato')):this.toast('このプレビューでは地図と詳細を確認できます'));}
   showMap(){this.phone.querySelector('.safety-page').hidden=true;this.phone.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page==='map'));this.closeSheet();}
   showSafety(){
     this.closeSheet();this.phone.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page==='safety'));
-    const self=personById('p5'),page=this.phone.querySelector('.safety-page');page.hidden=false;let selected=self.s==='sos'?'sos':'safe';
+    const self=this.personById('p5'),page=this.phone.querySelector('.safety-page');page.hidden=false;let selected=self.s==='sos'?'sos':'safe';
     page.innerHTML=`<h2>自分の安否</h2><p>10月21日の地震</p><div class="choice-buttons"><button data-state="safe">${symbol('safe')}無事</button><button data-state="sos">${symbol('sos')}SOS</button></div><div class="memo-field"><label class="form-label" for="${this.config.id}-memo">SOSメモ</label><textarea id="${this.config.id}-memo" placeholder="今いる場所や、助けてほしいこと">${escape(self.memo)}</textarea></div><button class="primary blue" data-save="safety">安否を更新する</button>`;
     const choose=state=>{selected=state;page.querySelectorAll('[data-state]').forEach(b=>b.classList.toggle('chosen',b.dataset.state===state));page.querySelector('.memo-field').hidden=state!=='sos';};choose(selected);
     page.querySelectorAll('[data-state]').forEach(b=>b.onclick=()=>choose(b.dataset.state));page.querySelector('[data-save]').onclick=()=>{self.s=selected;self.memo=page.querySelector('textarea').value;refreshAll();this.showMap();this.toast('安否を更新しました');};
@@ -179,7 +184,7 @@ class MapFrame{
     this.map.addLayer({id:'preview-building-rating',type:'fill',...shared,paint:{'fill-color':['match',PREVIEW_RATING,0,'#FBE8C5',1,'#F2AE5D',2,'#C5672E','#D4D7DC'],'fill-opacity':.58,'fill-outline-color':'rgba(133,109,85,0.28)'}},before);
     this.map.addLayer({id:'preview-building-unknown',type:'fill',...shared,filter:buildings.filter?['all',buildings.filter,['==',PREVIEW_RATING,3]]:['==',PREVIEW_RATING,3],paint:{'fill-pattern':'unknown-hatch','fill-opacity':.60}},before);
     this.phone.querySelector('.loading').hidden=true;this.phone.dataset.ready='true';this.render();
-    if(query.get('detail')==='sos')this.openPerson(personById('p0'));
+    if(query.get('detail')==='sos')this.openPerson(this.personById('p0'));
   }
 }
 class ListMapFrame extends MapFrame{
@@ -192,7 +197,7 @@ class ListMapFrame extends MapFrame{
     }
   }
   showPosition(){
-    const self=personById('p5');
+    const self=this.personById('p5');
     this.openSheet('<h2>位置記録</h2>',`<h3>${this.positionActive?'位置記録中':'位置記録は停止中'}</h3><p>${this.positionMessage||'架空の位置で操作を確認できます。'}</p><h3>最後に保存した位置</h3><p>${time(self.acquiredAt)}取得 ・ 精度 約${self.accuracy}m</p><p>緯度 ${self.location[1].toFixed(5)} ・ 経度 ${self.location[0].toFixed(5)}</p>`,this.positionActive?'<button class="primary blue" data-position="refresh">今の位置を取得</button><button class="secondary full safety-submit" data-position="stop">位置記録を停止</button>':'<button class="primary blue" data-position="start">位置記録を開始</button>');
     this.footer.querySelectorAll('[data-position]').forEach(button=>button.onclick=()=>{
       if(button.dataset.position==='stop'){this.positionActive=false;this.positionMessage='位置記録を停止しました';}
@@ -230,7 +235,7 @@ class ListMapFrame extends MapFrame{
     this.returnArea=null;this.setPage('safety');
     if(!this.config.localSituation){super.showSafety();return;}
     this.closeSheet();
-    const self=personById('p5'),page=this.phone.querySelector('.safety-page');
+    const self=this.personById('p5'),page=this.phone.querySelector('.safety-page');
     const previousAnswer=self.s==='rescued'?self.priorSafety:self.s;
     let selected=previousAnswer==='sos'?'sos':'safe';
     page.innerHTML=`<h2>自分の安否</h2><p>10月21日の地震</p><div class="choice-buttons"><button data-state="safe">${symbol('safe')}無事</button><button data-state="sos">${symbol('sos')}SOS</button></div><div class="memo-field"><label class="form-label" for="${this.config.id}-memo">SOSメモ</label><textarea id="${this.config.id}-memo" maxlength="500" aria-describedby="${this.config.id}-count" placeholder="今いる場所や、助けてほしいこと">${escape(self.memo)}</textarea><p class="memo-count" id="${this.config.id}-count"></p><button class="secondary full" data-save="memo">メモだけ保存する</button></div><button class="primary blue safety-submit" data-save="safety">安否を更新する</button>`;
@@ -270,7 +275,7 @@ class ListMapFrame extends MapFrame{
   rowsHTML(list){
     if(!list.length)return '<p class="empty-list" role="status">該当する人はいません</p>';
     return list.map(p=>{
-      const known=hasPosition(p),home=homeById(p.homeId);
+      const known=hasPosition(p),home=this.homeById(p.homeId);
       return `<button class="person-row" data-id="${escape(p.id)}">${known?symbol(p.s):`<span class="unknown-symbol">${icon('user')}</span>`}<span class="row-content"><strong>${escape(personLabel(p))}</strong><small>${known?`位置更新 ${age(p)}`:`普段の住居：${escape(home.name)}<br>寝室：${escape(p.bedroom)}`}</small></span>${known?`<span class="row-state ${p.s}">${labels[p.s]}</span>`:''}${icon('caret-right')}</button>`;
     }).join('');
   }
@@ -280,13 +285,13 @@ class ListMapFrame extends MapFrame{
       if(area){this.areaFilter=filter;this.paintArea();}else{this.listFilter=filter;this.refreshList();}
       container.querySelector(`[data-filter="${filter}"]`)?.focus({preventScroll:true});
     });
-    container.querySelectorAll('[data-id]').forEach(button=>button.onclick=()=>this.openPerson(personById(button.dataset.id)));
+    container.querySelectorAll('[data-id]').forEach(button=>button.onclick=()=>this.openPerson(this.personById(button.dataset.id)));
   }
   refreshList(){
     if(this.page!=='people')return;
     const scroll=this.peoplePage.querySelector('.people-rows')?.scrollTop||0;
-    const unknown=listCounts(people).unknown;
-    this.peoplePage.innerHTML=`<div class="people-heading"><h2 tabindex="-1">メンバー一覧</h2><p>グループ全体${this.listFilter==='unknown'?' ・ 位置不明':''}</p></div>${this.filtersHTML(people,this.listFilter)}<button class="unknown-list-link" aria-pressed="${this.listFilter==='unknown'}">${icon('user')}位置不明 ${unknown}人を見る${icon('caret-right')}</button><div class="people-rows">${this.rowsHTML(filterPeople(people,this.listFilter))}</div>`;
+    const unknown=listCounts(this.people).unknown;
+    this.peoplePage.innerHTML=`<div class="people-heading"><h2 tabindex="-1">メンバー一覧</h2><p>グループ全体${this.listFilter==='unknown'?' ・ 位置不明':''}</p></div>${this.filtersHTML(this.people,this.listFilter)}<button class="unknown-list-link" aria-pressed="${this.listFilter==='unknown'}">${icon('user')}位置不明 ${unknown}人を見る${icon('caret-right')}</button><div class="people-rows">${this.rowsHTML(filterPeople(this.people,this.listFilter))}</div>`;
     this.peoplePage.querySelector('.unknown-list-link').onclick=()=>{this.listFilter='unknown';this.refreshList();this.peoplePage.querySelector('.unknown-list-link').focus();};
     this.bindList(this.peoplePage);
     this.peoplePage.querySelector('.people-rows').scrollTop=scroll;
@@ -297,7 +302,7 @@ class ListMapFrame extends MapFrame{
     if(coordinates)this.map.easeTo({center:coordinates,offset:[0,-this.map.getContainer().clientHeight*.16],duration:350});
   }
   paintArea(){
-    const list=scopedPeople(people,this.areaIds);
+    const list=scopedPeople(this.people,this.areaIds);
     super.openSheet(`<h2>このエリアの${list.length}人</h2><button class="all-group-link">グループ全体を見る ${icon('caret-right')}</button>`,`${this.filtersHTML(list,this.areaFilter)}<div class="area-rows">${this.rowsHTML(filterPeople(list,this.areaFilter))}</div>`);
     this.sheet.classList.add('area-sheet');this.areaOpen=true;
     this.head.querySelector('.all-group-link').onclick=()=>this.showList();
@@ -318,7 +323,7 @@ class ListMapFrame extends MapFrame{
   openPerson(p){
     if(this.areaOpen)this.returnArea={ids:[...this.areaIds],key:this.areaKey,filter:this.areaFilter};
     if(!hasPosition(p)){
-      const home=homeById(p.homeId);
+      const home=this.homeById(p.homeId);
       this.openSheet(`<h2>${escape(personLabel(p))}</h2><p class="location-line">位置不明${p.acquiredAt?' ・ 3日以上更新なし':''}</p>`,`<h3>普段の住居・寝室</h3><div class="home-row"><strong>${escape(home.name)}</strong><button class="link-button" data-home>建物を見る ${icon('caret-right')}</button></div><div class="room">${icon('bed')}<span>${escape(p.bedroom)}</span></div>`);
       this.body.querySelector('[data-home]').onclick=()=>this.showHome(home,p);
     }else super.openPerson(p);
@@ -328,7 +333,7 @@ class ListMapFrame extends MapFrame{
   showHome(home,backPerson=null){
     super.showHome(home,backPerson);
     this.body.querySelectorAll('[data-id]').forEach(row=>{
-      const p=personById(row.dataset.id);
+      const p=this.personById(row.dataset.id);
       if(!hasPosition(p)){
         row.querySelector('.symbol').outerHTML=`<span class="unknown-symbol">${icon('user')}</span>`;
         row.querySelector('small').textContent='位置不明';
@@ -360,3 +365,7 @@ const assignmentFrame=new ListMapFrame(assignmentConfig,createFrame(assignmentCo
 frames.push(assignmentFrame);
 new OperationsDemo(assignmentFrame,{people,refreshAll,feedback:true,fourStage:true,assignmentWarning:true});
 if(query.get('demo')==='assignment'||location.hash==='#response-assignment-demo')requestAnimationFrame(()=>assignmentFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+
+const visibilityFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll});
+frames.push(visibilityFrame);
+if(query.get('demo')==='visibility'||location.hash==='#response-visibility-demo')requestAnimationFrame(()=>visibilityFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));

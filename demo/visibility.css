@@ -1,0 +1,24 @@
+.visibility-version .visibility-toolbar{height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 12px;background:#f3f7fb;border-bottom:1px solid #d6e0e8;color:#31485e;font-size:12px;z-index:7}
+.visibility-toolbar button{min-height:44px;flex:1;border:0;background:none;text-align:left;font-size:12px;font-weight:700;color:#155eef;padding:0;white-space:nowrap}
+.visibility-toolbar span{white-space:nowrap}
+.visibility-version .response-page,.visibility-version .people-page,.visibility-version .safety-page{top:122px}
+.visibility-version .people-page{overflow-y:auto;display:flex;flex-direction:column}
+.visibility-version .people-page[hidden]{display:none}
+.visibility-version .people-rows{flex:1;min-height:100px;overflow-y:auto}
+.visibility-report-icon{width:40px;height:40px;object-fit:contain;display:block}
+.visibility-case-symbol{background:none!important;border:0!important}
+.visibility-detail-icon{display:inline-flex;vertical-align:middle;margin-right:8px;color:#536a7d}
+.visibility-detail-icon .visibility-report-icon{width:30px;height:30px}
+.visibility-reporter{padding:10px 12px;background:#f3f7fb;border-radius:6px;font-size:14px;line-height:1.6}
+.visibility-note{margin:12px 16px;color:#536478;font-size:13px!important;line-height:1.7}
+.visibility-statistics{padding:12px 14px;flex-shrink:0;background:#f5f8fb;border-bottom:1px solid #d6e0e8}
+.visibility-statistics h3{font-size:15px;margin:0 0 10px}
+.visibility-stat-scroll{overflow-x:auto}
+.visibility-statistics table{border-collapse:collapse;width:100%;min-width:320px;font-size:12px;line-height:1.6}
+.visibility-statistics th,.visibility-statistics td{padding:7px 3px;border-bottom:1px solid #d6e0e8;text-align:center}
+.visibility-statistics th:first-child{text-align:left;white-space:nowrap}
+.visibility-stat-marker{display:flex;flex-direction:column;gap:3px;padding:9px 12px;border:1px solid #a9bdd1;border-radius:10px;background:#fff;color:#183447;box-shadow:0 2px 8px #15314d22;font-size:12px;text-align:left;cursor:pointer}
+.visibility-stat-marker strong{color:#536478;font-size:11px}
+.visibility-legend .visibility-report-icon{width:30px;height:30px}
+.visibility-version .ops-map-report .visibility-report-icon{width:30px;height:30px}
+.visibility-version .ops-form .visibility-note{margin-inline:0}
