@@ -1,7 +1,7 @@
 import {installMapOverview} from './map-overview-demo.mjs?v=3';
 import {OperationsDemo} from './operations-demo.mjs?v=4';
 import {REGIONS,regionName,filterCases,summarizeCases} from './operations-model.mjs?v=4';
-import {STATES,NOW,hasPosition,buildIndex} from './clustering.mjs?v=6';
+import {STATES,NOW,hasPosition,buildIndex} from './clustering.mjs?v=7';
 import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectReport,visibilityCsv,statisticsCsv,safetyStatistics,reportIcon,viewingScope,municipalMapBounds,TOWN_CENTERS} from './visibility-model.mjs?v=2';
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -96,7 +96,7 @@ class VisibilityController{
   ready(){const t=this.timing(),start=disclosureStart(t);return start!==null&&t.now>=start+180000;}
   allowed(id){const p=this.rawPeople.find(p=>p.id===id);return p&&canSeePerson(p,this.viewer,this.timing());}
   projectPeople(){return this.rawPeople.map(p=>projectPerson(p,this.viewer,this.timing())).filter(Boolean);}
-  refreshPeople(){this.frame.config.people=this.projectPeople();this.frame.index=buildIndex(Supercluster,this.frame.people,this.frame.showSafe);this.frame.revision++;this.frame.render();this.frame.refreshList?.();}
+  refreshPeople(){this.frame.config.people=this.projectPeople();this.frame.index=buildIndex(Supercluster,this.frame.people,this.frame.showSafe,this.frame.clusterEndZoom);this.frame.revision++;this.frame.render();this.frame.refreshList?.();}
   updateToolbar(){const sec=Math.max(0,Math.floor((this.timing().now-(disclosureStart(this.clock)??NOW))/1000));this.toolbar.querySelector('button').textContent=`${roles[this.viewer.role]}・${viewingScope(this.viewer).label}`;this.toolbar.querySelector('[data-demo-clock]').textContent=`経過 ${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;}
   apply(){
     this.lastReady=this.ready();this.updateToolbar();this.ops?.setRole();this.refreshPeople();
@@ -136,7 +136,7 @@ class VisibilityController{
   }
 }
 
-export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false}){
+export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false}){
   class VisibilityFrame extends ListMapFrame{
     showMap(){const entering=this.page!=='map';super.showMap();if(entering&&this.visibility?.viewer.role==='municipal')this.visibility.showCityMap();}
     personById(id){return id==='p5'&&this.visibility?this.visibility.rawPeople.find(p=>p.id===id):super.personById(id);}
@@ -172,6 +172,7 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
   }
   const config={id:'response-visibility',zoom,enhanced:true,localSituation:true,positionControls:true,people:[],homes:structuredClone(homes),version:'ver 1.6.4',summary:'地域ごとの公開範囲設定と通報のアイコンを追加'};
   if(overview)Object.assign(config,{id:'response-map',version:'ver 1.6.5',summary:'ver 1.6.4の別案'});
+  if(wideAreaClusters)Object.assign(config,{id:'response-neighborhood',version:'ver 1.6.6',summary:'クラスタは、さらに広域の表示から',clusterEndZoom:14,wideAreaClusters:true});
   const frame=new VisibilityFrame(config,createFrame(config)),visibility=new VisibilityController(frame,people,config.homes);
   new VisibilityOperations(frame,visibility,refreshAll);visibility.apply();if(overview)installMapOverview(frame);return frame;
 }

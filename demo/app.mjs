@@ -1,9 +1,9 @@
-import {STATES,CENTER,NOW,CLUSTER_END_ZOOM,hasPosition,buildIndex,getNodes,displayCounts,clusterViewport} from './clustering.mjs?v=6';
+import {STATES,CENTER,NOW,CLUSTER_END_ZOOM,hasPosition,buildIndex,getNodes,displayCounts,clusterViewport} from './clustering.mjs?v=7';
 import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
 import {OperationsDemo} from './operations-demo.mjs?v=4';
-import {mountVisibilityDemo} from './visibility-demo.mjs?v=7';
+import {mountVisibilityDemo} from './visibility-demo.mjs?v=8';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -32,15 +32,16 @@ function createFrame(config){
   document.querySelector('#board').append(section);
   return section.querySelector('.phone');
 }
-function refreshAll(){for(const frame of frames){frame.refreshSource?.();frame.index=buildIndex(Supercluster,frame.people,frame.showSafe);frame.revision++;frame.render();frame.refreshList?.();}}
+function refreshAll(){for(const frame of frames){frame.refreshSource?.();frame.index=buildIndex(Supercluster,frame.people,frame.showSafe,frame.clusterEndZoom);frame.revision++;frame.render();frame.refreshList?.();}}
 
 class MapFrame{
   get people(){return this.config.people||people;}
   get homes(){return this.config.homes||homes;}
+  get clusterEndZoom(){return this.config.clusterEndZoom??CLUSTER_END_ZOOM;}
   personById(id){return this.people.find(p=>p.id===id);}
   homeById(id){return this.homes.find(h=>h.id===id);}
   constructor(config,phone){
-    this.config=config;this.phone=phone;this.showSafe=true;this.index=buildIndex(Supercluster,this.people);this.markers=new Map();this.revision=0;this.selected=null;
+    this.config=config;this.phone=phone;this.showSafe=true;this.index=buildIndex(Supercluster,this.people,true,this.clusterEndZoom);this.markers=new Map();this.revision=0;this.selected=null;
     this.sheet=phone.querySelector('.sheet');this.head=phone.querySelector('.sheet-head');this.body=phone.querySelector('.sheet-body');this.footer=phone.querySelector('.sheet-footer');
     this.map=new maplibregl.Map({container:config.id+'-map',style:'https://tiles.openfreemap.org/styles/positron',center:CENTER,zoom:config.zoom,maxZoom:21,pitch:0,bearing:0,dragRotate:false,attributionControl:false,locale:{'NavigationControl.ZoomIn':'拡大','NavigationControl.ZoomOut':'縮小'}});
     this.map.addControl(new maplibregl.AttributionControl({compact:false}),'bottom-right');
@@ -51,7 +52,7 @@ class MapFrame{
     this.map.on('zoom',()=>{if(Math.floor(this.map.getZoom())!==this.renderedZoom&&!this.pendingFrame){this.pendingFrame=requestAnimationFrame(()=>{this.pendingFrame=null;this.render();});}});
     this.map.on('moveend',()=>this.render());
     this.map.on('click',event=>this.selectBuilding(event));
-    phone.querySelector('.switch').onclick=event=>{this.showSafe=!this.showSafe;event.currentTarget.setAttribute('aria-checked',String(this.showSafe));this.index=buildIndex(Supercluster,this.people,this.showSafe);this.revision++;this.render();};
+    phone.querySelector('.switch').onclick=event=>{this.showSafe=!this.showSafe;event.currentTarget.setAttribute('aria-checked',String(this.showSafe));this.index=buildIndex(Supercluster,this.people,this.showSafe,this.clusterEndZoom);this.revision++;this.render();};
     phone.querySelector('.legend-trigger').onclick=()=>this.showLegend();
     phone.querySelector('.unknown').onclick=()=>this.showUnknown();
     phone.querySelector('.menu').onclick=()=>this.showMenu();
@@ -74,7 +75,7 @@ class MapFrame{
     const b=this.map.getBounds(),z=this.map.getZoom();this.renderedZoom=Math.floor(z);
     const nodes=getNodes(this.index,[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()],z),shown=new Set();let clusters=0,singles=0;
     for(const feature of nodes){
-      const props=feature.properties,isCluster=Boolean(props.cluster),p=isCluster?null:this.personById(props.personId),bubble=isCluster||z<CLUSTER_END_ZOOM;
+      const props=feature.properties,isCluster=Boolean(props.cluster),p=isCluster?null:this.personById(props.personId),bubble=isCluster||(!this.config.wideAreaClusters&&z<this.clusterEndZoom);
       const key=isCluster?`cluster-${props.cluster_id}`:`person-${props.personId}`;shown.add(key);
       const counts=displayCounts(feature),leaves=isCluster?this.index.getLeaves(props.cluster_id,Infinity):[feature];
       const members=leaves.map(f=>f.properties.personId).join(',');
@@ -94,7 +95,7 @@ class MapFrame{
             el.removeAttribute('aria-label');
             el.innerHTML=`<button class="bubble-main" aria-label="${escape(description)}">${rows}</button><button class="cluster-list" aria-label="このエリアの${leaves.length}人を一覧で見る">${icon('list-bullets')}一覧${icon('caret-right')}</button>`;
           }
-          el.onclick=event=>{event.stopPropagation();if(this.config.enhanced&&event.target.closest('.cluster-list')){this.showArea(members.split(','),key,feature.geometry.coordinates);return;}this.closeSheet();if(isCluster){const view=clusterViewport(leaves,this.map.getZoom(),this.index.getClusterExpansionZoom(props.cluster_id));this.map.fitBounds(view.bounds,view.options);}else this.openMapPerson(p);};
+          el.onclick=event=>{event.stopPropagation();if(this.config.enhanced&&event.target.closest('.cluster-list')){this.showArea(members.split(','),key,feature.geometry.coordinates);return;}this.closeSheet();if(isCluster){const view=clusterViewport(leaves,this.map.getZoom(),this.index.getClusterExpansionZoom(props.cluster_id),this.clusterEndZoom);this.map.fitBounds(view.bounds,view.options);}else this.openMapPerson(p);};
         }else{
           el.innerHTML=symbol(p.s)+(NOW-p.acquiredAt>5*60000?`<span class="age">${age(p)}</span>`:'')+(p.impact?sensor('impact',false,this.config.enhanced):'')+(p.enclosed?sensor('enclosed'):'');
           el.setAttribute('aria-label',`${personLabel(p)}、${labels[p.s]}${p.impact?'、衝撃あり':''}${p.enclosed?'、閉所あり':''}`);el.dataset.personId=p.id;el.dataset.memberIds=p.id;
@@ -350,3 +351,7 @@ if(['assignment','stages','response','feedback'].includes(query.get('demo'))||['
 const mapOverviewFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true});
 frames.push(mapOverviewFrame);
 if(['map-summary','visibility'].includes(query.get('demo'))||['#response-map-demo','#response-visibility-demo'].includes(location.hash))requestAnimationFrame(()=>mapOverviewFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+
+const neighborhoodFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true,wideAreaClusters:true});
+frames.push(neighborhoodFrame);
+if(query.get('demo')==='neighborhood'||location.hash==='#response-neighborhood-demo')requestAnimationFrame(()=>neighborhoodFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
