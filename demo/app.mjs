@@ -347,10 +347,6 @@ frames.push(assignmentFrame);
 new OperationsDemo(assignmentFrame,{people,refreshAll,feedback:true,fourStage:true,assignmentWarning:true});
 if(['assignment','stages','response','feedback'].includes(query.get('demo'))||['#response-assignment-demo','#response-stages-demo','#response-demo','#response-feedback-demo'].includes(location.hash))requestAnimationFrame(()=>assignmentFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
 
-const visibilityFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll});
-frames.push(visibilityFrame);
-if(query.get('demo')==='visibility'||location.hash==='#response-visibility-demo')requestAnimationFrame(()=>visibilityFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
-
 const mapOverviewFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true});
 frames.push(mapOverviewFrame);
-if(query.get('demo')==='map-summary'||location.hash==='#response-map-demo')requestAnimationFrame(()=>mapOverviewFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+if(['map-summary','visibility'].includes(query.get('demo'))||['#response-map-demo','#response-visibility-demo'].includes(location.hash))requestAnimationFrame(()=>mapOverviewFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
