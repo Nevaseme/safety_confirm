@@ -1,24 +1,8 @@
-.map-overview-version .map-hierarchy-controls{position:absolute;z-index:4;top:12px;left:12px;display:flex;gap:3px;padding:3px;border:1px solid #c9d6e3;border-radius:9px;background:#fff;box-shadow:0 2px 6px #18344718}
-.map-hierarchy-controls button{min-height:44px;padding:6px 12px;border:0;border-radius:6px;background:white;color:#536478;font-size:13px;font-weight:700}
-.map-hierarchy-controls button[aria-pressed=true]{background:#edf3ff;color:#155eef}
-.map-overview-version.ops-picking .map-hierarchy-controls{display:none}
-.map-overview-version .town-map-bubble{width:96px;min-width:96px;min-height:60px;padding:8px!important;border:1px solid #becbd7;border-radius:12px;font-size:12px;line-height:1.5;box-shadow:0 2px 8px #18344722}
-.town-map-bubble>strong{display:block;white-space:nowrap;color:#183447;font-size:12px}
-.town-map-bubble>span{display:flex;justify-content:space-between;gap:4px;margin-top:4px}
-.town-map-bubble b{font-weight:650;font-size:11px}.town-map-bubble .town-high{color:#b42318}
-.map-overview-version .map-point-report,.map-overview-version .map-point-person{display:flex;align-items:center;justify-content:center;border:0;padding:0;background:transparent;cursor:pointer;color:#155eef}
-.map-point-report img{width:32px;height:32px;display:block;object-fit:contain;filter:drop-shadow(0 0 2px #fff)}
-.map-point-report i{font-size:30px;text-shadow:0 0 3px #fff}
-.map-point-person{position:absolute}.map-point-person .symbol{width:40px;height:40px;border:3px solid white;box-shadow:0 2px 5px #18344733;font-size:12px}
-.map-point-person .symbol.unanswered{font-size:25px}.map-point-person .symbol i{font-size:27px}
-.map-point-person .sensor{top:0;right:0}.map-point-person .sensor.enclosed{left:0;right:auto}
-.map-mixed-group{padding:4px 8px;border:1px solid #58718b;border-radius:10px;background:white;color:#183447;text-align:center;box-shadow:0 2px 7px #18344722}
-.map-mixed-group strong,.map-mixed-group span{display:block;font-size:12px;line-height:1.5;white-space:nowrap}.map-mixed-group span{color:#b42318;font-size:11px}
-.town-map-bubble:focus-visible,.map-mixed-group:focus-visible,.map-point-report:focus-visible,.map-point-person:focus-visible{outline:3px solid #155eef;outline-offset:3px}
+.map-overview-version .ops-map-report{width:44px;height:44px;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:0;background:transparent;color:#155eef}
+.map-overview-version .ops-map-report .visibility-report-icon{width:32px;height:32px;object-fit:contain;filter:drop-shadow(0 0 2px #fff)}
+.map-overview-version .ops-map-report i{font-size:30px;text-shadow:0 0 3px #fff}
 .town-safety-counts{display:grid;grid-template-columns:1fr 1fr;gap:0 20px;margin:0}.town-safety-counts>div{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #d6e0e8;padding:14px 0}
 .town-safety-counts dt{font-size:14px;color:#536478}.town-safety-counts dd{font-size:24px;font-weight:750;margin:0}.town-safety-counts small{font-size:13px;font-weight:500;margin-left:4px}
 .town-operation-summary{padding:18px 0 8px}.town-urgent{display:flex;align-items:center;justify-content:space-between;margin:0!important;font-size:15px!important}.town-urgent>span{display:flex;align-items:center;gap:6px}.town-urgent i,.town-urgent strong{color:#b42318}.town-urgent strong{font-size:24px}.town-urgent small{font-size:13px;margin-left:5px}
 .town-open-note{margin:3px 0 16px!important;color:#697586;font-size:12px!important}.town-shortage-state{display:flex;align-items:center;gap:6px;margin:0!important;font-size:15px!important}.town-shortage-state strong{margin-left:auto}.town-shortage-state i{color:#536478;font-size:22px}
 .town-materials{margin:0 0 22px}.town-materials>div{display:flex;justify-content:space-between;padding:13px 0;border-bottom:1px solid #d6e0e8}.town-materials dt{font-size:15px}.town-materials dd{font-size:21px;font-weight:750;margin:0}.town-materials small{font-size:14px;font-weight:500;margin-left:6px}
-.map-list-symbol{position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#155eef}.map-list-symbol>img{width:30px;height:30px;object-fit:contain}.map-list-symbol>i{font-size:28px}
-.map-nearby-list .row-content small{line-height:1.6;font-size:12px}

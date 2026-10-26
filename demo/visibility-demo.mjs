@@ -1,4 +1,4 @@
-import {installMapOverview} from './map-overview-demo.mjs?v=2';
+import {installMapOverview} from './map-overview-demo.mjs?v=3';
 import {OperationsDemo} from './operations-demo.mjs?v=4';
 import {REGIONS,regionName,filterCases,summarizeCases} from './operations-model.mjs?v=4';
 import {STATES,NOW,hasPosition,buildIndex} from './clustering.mjs?v=6';
@@ -171,7 +171,7 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
     showLegend(){super.showLegend();this.body.insertAdjacentHTML('beforeend',`<h3>通報の緊急度</h3>${['高','中','低','未設定'].map(urgency=>`<div class="legend-row visibility-legend">${reportSymbol({urgency})}<span>${urgency==='未設定'?'未設定（判定前）':'緊急度 '+urgency}</span></div>`).join('')}`);}
   }
   const config={id:'response-visibility',zoom,enhanced:true,localSituation:true,positionControls:true,people:[],homes:structuredClone(homes),version:'ver 1.6.4',summary:'地域ごとの公開範囲設定と通報のアイコンを追加'};
-  if(overview)Object.assign(config,{id:'response-map',zoom:15.2,version:'ver 1.6.5',summary:'ver 1.6.4の別案'});
+  if(overview)Object.assign(config,{id:'response-map',version:'ver 1.6.5',summary:'ver 1.6.4の別案'});
   const frame=new VisibilityFrame(config,createFrame(config)),visibility=new VisibilityController(frame,people,config.homes);
   new VisibilityOperations(frame,visibility,refreshAll);visibility.apply();if(overview)installMapOverview(frame);return frame;
 }
