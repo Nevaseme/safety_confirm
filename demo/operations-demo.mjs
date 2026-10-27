@@ -18,14 +18,14 @@ export class OperationsDemo{
     this.summaryButton=document.createElement('button');this.summaryButton.className='ops-region-button';this.summaryButton.textContent='地域集計';this.summaryButton.onclick=()=>this.showSummary();phone.querySelector('.top').append(this.summaryButton);
     const nav=document.createElement('button');nav.dataset.page='response';nav.innerHTML=icon('users-three')+'対応';nav.onclick=()=>this.showQueue();phone.querySelector('[data-page=safety]').before(nav);
     const setPage=frame.setPage.bind(frame);
-    frame.setPage=page=>{if(this.feedback&&page!=='map')this.stopMapPick();setPage(page);this.panel.hidden=page!=='response';this.summaryButton.hidden=page!=='response';phone.querySelector('.title').textContent=page==='response'?'対応':'訓練';phone.querySelectorAll('.nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.page===page?'page':'false'));};
+    frame.setPage=page=>{if(this.feedback&&page!=='map')this.stopMapPick();setPage(page);this.panel.hidden=page!=='response';this.summaryButton.hidden=page!=='response';phone.querySelector('.title').textContent=frame.config.incidentTitle||(page==='response'?'対応':'訓練');phone.querySelectorAll('.nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.page===page?'page':'false'));};
     const menu=frame.showMenu.bind(frame);
     frame.showMenu=()=>{if(this.feedback)this.stopMapPick();menu();const button=document.createElement('button');button.className='person-row';button.innerHTML=icon('users-three')+'<span class="row-content"><strong>対応・通報</strong></span>'+icon('caret-right');button.onclick=()=>this.showQueue();frame.body.prepend(button);if(this.feedback){const archived=document.createElement('button');archived.className='person-row';archived.textContent=`取り消した通報 ${this.cases.filter(r=>r.cancelled).length}件`;archived.onclick=()=>this.enter({view:'cancelled'});frame.body.append(archived);}const role=document.createElement('button');role.className='person-row';role.textContent=`操作する役割（デモ）：${this.role==='ADMIN'?'管理者':this.role==='LEADER'?'班長':'メンバー'}`;role.onclick=()=>this.roleForm();frame.body.append(role);};
     const personDetail=frame.openPerson.bind(frame);
     frame.openPerson=person=>{personDetail(person);const row=this.cases.find(r=>r.personId===person.id);if(row){const button=document.createElement('button');button.className='secondary full ops-detail-link';button.textContent='担当・対応を見る';button.onclick=()=>this.openCase(row.id);frame.body.append(button);}};
     const safety=frame.showSafety.bind(frame);
     frame.showSafety=()=>{safety();phone.querySelectorAll('[data-save]').forEach(button=>{const save=button.onclick;button.onclick=event=>{save(event);this.syncSafety();};});};
-    phone.querySelector('.incident-date').textContent='訓練　10月26日 14:32';clearInterval(frame.clockTimer);
+    phone.querySelector('.incident-date').textContent=frame.config.incidentTitle?'10月26日 14:32':'訓練　10月26日 14:32';clearInterval(frame.clockTimer);
     frame.map.on('load',()=>this.drawReports());
     if(this.feedback)this.installFeedback();
     this.showQueue();
