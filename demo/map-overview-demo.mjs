@@ -21,6 +21,7 @@ export function installMapOverview(frame){
   const summary=id=>townSummary(id,view.rawPeople,ops.cases);
   function focusTown(id){
     frame.closeSheet();frame.showMap();
+    if(frame.config.townFixtures){view.showTownMap(id);return;}
     const report=ops.cases.find(r=>!r.cancelled&&!r.personId&&r.regionIds.includes(id));
     frame.map.flyTo({center:report?.location||TOWN_CENTERS[id],zoom:16.8,duration:300});
   }

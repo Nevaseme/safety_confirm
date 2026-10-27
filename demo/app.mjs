@@ -3,7 +3,7 @@ import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
 import {OperationsDemo} from './operations-demo.mjs?v=4';
-import {mountVisibilityDemo} from './visibility-demo.mjs?v=8';
+import {mountVisibilityDemo} from './visibility-demo.mjs?v=9';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -43,7 +43,7 @@ class MapFrame{
   constructor(config,phone){
     this.config=config;this.phone=phone;this.showSafe=true;this.index=buildIndex(Supercluster,this.people,true,this.clusterEndZoom);this.markers=new Map();this.revision=0;this.selected=null;
     this.sheet=phone.querySelector('.sheet');this.head=phone.querySelector('.sheet-head');this.body=phone.querySelector('.sheet-body');this.footer=phone.querySelector('.sheet-footer');
-    this.map=new maplibregl.Map({container:config.id+'-map',style:'https://tiles.openfreemap.org/styles/positron',center:CENTER,zoom:config.zoom,maxZoom:21,pitch:0,bearing:0,dragRotate:false,attributionControl:false,locale:{'NavigationControl.ZoomIn':'拡大','NavigationControl.ZoomOut':'縮小'}});
+    this.map=new maplibregl.Map({container:config.id+'-map',style:'https://tiles.openfreemap.org/styles/positron',center:config.center||CENTER,zoom:config.zoom,maxZoom:21,pitch:0,bearing:0,dragRotate:false,attributionControl:false,locale:{'NavigationControl.ZoomIn':'拡大','NavigationControl.ZoomOut':'縮小'}});
     this.map.addControl(new maplibregl.AttributionControl({compact:false}),'bottom-right');
     this.map.addControl(new maplibregl.ScaleControl({maxWidth:65,unit:'metric'}),'bottom-left');
     this.map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
@@ -355,3 +355,7 @@ if(['map-summary','visibility'].includes(query.get('demo'))||['#response-map-dem
 const neighborhoodFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true,wideAreaClusters:true});
 frames.push(neighborhoodFrame);
 if(query.get('demo')==='neighborhood'||location.hash==='#response-neighborhood-demo')requestAnimationFrame(()=>neighborhoodFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+
+const townsFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true,wideAreaClusters:true,correctedTowns:true});
+frames.push(townsFrame);
+if(query.get('demo')==='towns'||location.hash==='#response-towns-demo')requestAnimationFrame(()=>townsFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));

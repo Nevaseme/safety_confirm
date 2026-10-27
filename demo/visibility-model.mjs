@@ -7,8 +7,8 @@ export function viewingScope(viewer){
   const municipal=viewer.role==='municipal';
   return {label:municipal?'架空市全域':REGIONS.find(r=>r.id===viewer.regionId)?.name||viewer.regionId,townIds:municipal?towns.map(r=>r.id):[viewer.regionId]};
 }
-export function municipalMapBounds(reports){
-  const points=[...Object.values(TOWN_CENTERS),...reports.filter(r=>!r.personId&&!r.cancelled&&Array.isArray(r.location)&&r.location.length===2&&r.location.every(Number.isFinite)).map(r=>r.location)];
+export function municipalMapBounds(reports,centers=TOWN_CENTERS){
+  const points=[...Object.values(centers),...reports.filter(r=>!r.personId&&!r.cancelled&&Array.isArray(r.location)&&r.location.length===2&&r.location.every(Number.isFinite)).map(r=>r.location)];
   return [[Math.min(...points.map(p=>p[0])),Math.min(...points.map(p=>p[1]))],[Math.max(...points.map(p=>p[0])),Math.max(...points.map(p=>p[1]))]];
 }
 
