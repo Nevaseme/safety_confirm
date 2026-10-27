@@ -5,6 +5,22 @@ import {people,homes} from './data.mjs';
 import {safetyStatistics,projectPerson,municipalMapBounds} from './visibility-model.mjs';
 
 const inside=([lng,lat],[[w,s],[e,n]])=>lng>=w&&lng<=e&&lat>=s&&lat<=n;
+test('detail examples restore observations without changing town membership, locations or privacy',()=>{
+  const baseline=createTownFixtures(people,homes),fixture=createTownFixtures(people,homes,{observations:true});
+  assert.deepEqual(fixture.homes,baseline.homes);assert.deepEqual(fixture.bounds,baseline.bounds);assert.deepEqual(fixture.reports,baseline.reports);
+  assert.deepEqual(fixture.people.map(p=>[p.id,p.regionId,p.homeId,p.address,p.s,p.location]),baseline.people.map(p=>[p.id,p.regionId,p.homeId,p.address,p.s,p.location]));
+  const target=fixture.people.find(p=>p.regionId==='east'&&p.s==='sos');
+  assert.equal(target.impact,true);assert.equal(target.enclosed,true);
+  const context={role:'resident',regionId:'east'},timing={eewReceivedAt:0,now:1000};
+  const visible=projectPerson(target,context,timing);
+  for(const key of ['impact','enclosed','impactAt','enclosedAt','acquiredAt','accuracy','answeredAt'])assert.equal(visible[key],target[key]);
+  for(const key of ['address','homeId','bedroom'])assert.ok(!(key in visible));
+  assert.equal(projectPerson(target,{role:'municipal',regionId:'east'},timing),null);
+  assert.equal(projectPerson(target,{role:'resident',regionId:'west'},timing),null);
+  const unknown=fixture.people.find(p=>p.regionId==='east'&&p.s==='unanswered'&&!p.location);
+  assert.equal(projectPerson(unknown,context,{...timing,now:179999}),null);
+  assert.equal(projectPerson(unknown,context,{...timing,now:180000}).address,unknown.address);
+});
 test('each demo town contains several households, residents and all safety states',()=>{
   const fixture=createTownFixtures(people,homes);
   assert.equal(new Set(fixture.people.map(p=>p.id)).size,36);
