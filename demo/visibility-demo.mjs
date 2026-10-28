@@ -143,7 +143,7 @@ class VisibilityController{
   }
 }
 
-export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false,namedResidents=false,townDisplayFixes=false}){
+export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false,namedResidents=false,townDisplayFixes=false,restoredListFields=false}){
   class VisibilityFrame extends ListMapFrame{
     showMap(){const entering=this.page!=='map';super.showMap();if(entering&&this.visibility?.viewer.role==='municipal')this.visibility.showCityMap();}
     personById(id){return id==='p5'&&this.visibility?this.visibility.rawPeople.find(p=>p.id===id):super.personById(id);}
@@ -154,6 +154,11 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
       if(!this.visibility||this.page!=='people')return super.refreshList();
       if(this.visibility.viewer.role==='municipal'){this.peoplePage.innerHTML='<div class="people-heading"><h2 tabindex="-1">安否統計</h2></div>'+this.visibility.statisticsHTML()+'<p class="visibility-note">自治体職員には安否の統計だけを表示します。</p><button class="ops-csv" data-statistics-csv>安否の統計をCSVで書き出す</button>';this.peoplePage.querySelector('[data-statistics-csv]').onclick=()=>saveCsv(statisticsCsv(this.visibility.rawPeople),'PlanD-demo-safety-statistics.csv');return;}
       super.refreshList();this.peoplePage.querySelector('.people-heading p').textContent='個別に確認できる人';
+      if(this.config.restoredListFields)for(const row of this.peoplePage.querySelectorAll('.people-rows [data-id]')){
+        const p=this.people.find(person=>person.id===row.dataset.id),detail=row.querySelector('small');
+        if(hasPosition(p))detail.textContent+=`・位置更新 ${Math.max(0,Math.round((NOW-p.acquiredAt)/60000))}分前`;
+        else detail.innerHTML+=`<br>寝室：${esc(p.bedroom||'未登録')}`;
+      }
       this.peoplePage.insertAdjacentHTML('afterbegin',this.visibility.statisticsHTML());
       if(this.visibility.viewer.role==='municipal')this.peoplePage.insertAdjacentHTML('beforeend','<p class="visibility-note">自治体職員には安否の統計だけを表示します。</p>');
       else if(!this.visibility.ready())this.peoplePage.insertAdjacentHTML('beforeend','<p class="visibility-note">3分間は反応なしの個人情報を表示しません。</p>');
@@ -187,6 +192,7 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
   if(earthquakeTitle)Object.assign(config,{id:'response-earthquake',version:'ver 1.6.9',summary:'タイトルを「地震発生」に変更',incidentTitle:'地震発生'});
   if(namedResidents)Object.assign(config,{id:'response-names',version:'ver 1.6.10',summary:'住民に自然な氏名を設定'});
   if(townDisplayFixes)Object.assign(config,{id:'response-town-display',version:'ver 1.6.11',summary:'自町内会の吹き出しを非表示、建築年と応答なしの観測例を追加',townDisplayFixes:true});
+  if(restoredListFields)Object.assign(config,{id:'response-list-fields',version:'ver 1.6.12',summary:'人物一覧に位置更新の経過時間と寝室情報を復元',restoredListFields:true});
   const frame=new VisibilityFrame(config,createFrame(config)),visibility=new VisibilityController(frame,people,config.homes);
   new VisibilityOperations(frame,visibility,refreshAll);visibility.apply();if(overview)installMapOverview(frame);return frame;
 }
