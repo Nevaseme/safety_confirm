@@ -3,7 +3,7 @@ import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
 import {OperationsDemo} from './operations-demo.mjs?v=5';
-import {mountVisibilityDemo} from './visibility-demo.mjs?v=11';
+import {mountVisibilityDemo} from './visibility-demo.mjs?v=12';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -370,3 +370,7 @@ if(query.get('demo')==='person-details'||location.hash==='#response-details-demo
 const earthquakeFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true,wideAreaClusters:true,correctedTowns:true,restoredPersonDetails:true,earthquakeTitle:true});
 frames.push(earthquakeFrame);
 if(query.get('demo')==='earthquake'||location.hash==='#response-earthquake-demo')requestAnimationFrame(()=>earthquakeFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+
+const namesFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true,wideAreaClusters:true,correctedTowns:true,restoredPersonDetails:true,earthquakeTitle:true,namedResidents:true});
+frames.push(namesFrame);
+if(query.get('demo')==='names'||location.hash==='#response-names-demo')requestAnimationFrame(()=>namesFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));

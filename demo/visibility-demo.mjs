@@ -1,5 +1,5 @@
 import {installMapOverview} from './map-overview-demo.mjs?v=4';
-import {createTownFixtures} from './town-fixtures.mjs?v=2';
+import {createTownFixtures} from './town-fixtures.mjs?v=3';
 import {OperationsDemo} from './operations-demo.mjs?v=5';
 import {REGIONS,regionName,filterCases,summarizeCases} from './operations-model.mjs?v=4';
 import {STATES,NOW,hasPosition,buildIndex} from './clustering.mjs?v=7';
@@ -142,7 +142,7 @@ class VisibilityController{
   }
 }
 
-export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false}){
+export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false,namedResidents=false}){
   class VisibilityFrame extends ListMapFrame{
     showMap(){const entering=this.page!=='map';super.showMap();if(entering&&this.visibility?.viewer.role==='municipal')this.visibility.showCityMap();}
     personById(id){return id==='p5'&&this.visibility?this.visibility.rawPeople.find(p=>p.id===id):super.personById(id);}
@@ -180,9 +180,10 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
   const config={id:'response-visibility',zoom,enhanced:true,localSituation:true,positionControls:true,people:[],homes:structuredClone(homes),version:'ver 1.6.4',summary:'地域ごとの公開範囲設定と通報のアイコンを追加'};
   if(overview)Object.assign(config,{id:'response-map',version:'ver 1.6.5',summary:'ver 1.6.4の別案'});
   if(wideAreaClusters)Object.assign(config,{id:'response-neighborhood',version:'ver 1.6.6',summary:'クラスタは、さらに広域の表示から',clusterEndZoom:14,wideAreaClusters:true});
-  if(correctedTowns){const fixture=createTownFixtures(people,homes,{observations:restoredPersonDetails});people=fixture.people;Object.assign(config,{id:'response-towns',version:'ver 1.6.7',summary:'町内会の人数・東西配置・拡大先を修正',townFixtures:fixture,homes:fixture.homes,center:fixture.centers.east});}
+  if(correctedTowns){const fixture=createTownFixtures(people,homes,{observations:restoredPersonDetails,namedResidents});people=fixture.people;Object.assign(config,{id:'response-towns',version:'ver 1.6.7',summary:'町内会の人数・東西配置・拡大先を修正',townFixtures:fixture,homes:fixture.homes,center:fixture.centers.east});}
   if(restoredPersonDetails)Object.assign(config,{id:'response-details',version:'ver 1.6.8',summary:'公開範囲を保ち、人物詳細の表示を復元',restoredPersonDetails:true});
   if(earthquakeTitle)Object.assign(config,{id:'response-earthquake',version:'ver 1.6.9',summary:'タイトルを「地震発生」に変更',incidentTitle:'地震発生'});
+  if(namedResidents)Object.assign(config,{id:'response-names',version:'ver 1.6.10',summary:'住民に自然な氏名を設定'});
   const frame=new VisibilityFrame(config,createFrame(config)),visibility=new VisibilityController(frame,people,config.homes);
   new VisibilityOperations(frame,visibility,refreshAll);visibility.apply();if(overview)installMapOverview(frame);return frame;
 }
