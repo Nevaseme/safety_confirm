@@ -182,11 +182,11 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
   const config={id:'response-visibility',zoom,enhanced:true,localSituation:true,positionControls:true,people:[],homes:structuredClone(homes),version:'ver 1.6.4',summary:'地域ごとの公開範囲設定と通報のアイコンを追加'};
   if(overview)Object.assign(config,{id:'response-map',version:'ver 1.6.5',summary:'ver 1.6.4の別案'});
   if(wideAreaClusters)Object.assign(config,{id:'response-neighborhood',version:'ver 1.6.6',summary:'クラスタは、さらに広域の表示から',clusterEndZoom:14,wideAreaClusters:true});
-  if(correctedTowns){const fixture=createTownFixtures(people,homes,{observations:restoredPersonDetails,namedResidents});people=fixture.people;Object.assign(config,{id:'response-towns',version:'ver 1.6.7',summary:'町内会の人数・東西配置・拡大先を修正',townFixtures:fixture,homes:fixture.homes,center:fixture.centers.east});}
+  if(correctedTowns){const fixture=createTownFixtures(people,homes,{observations:restoredPersonDetails,namedResidents});if(townDisplayFixes)Object.assign(fixture.people.find(p=>p.id==='p8'),{impact:true,enclosed:true});people=fixture.people;Object.assign(config,{id:'response-towns',version:'ver 1.6.7',summary:'町内会の人数・東西配置・拡大先を修正',townFixtures:fixture,homes:fixture.homes,center:fixture.centers.east});}
   if(restoredPersonDetails)Object.assign(config,{id:'response-details',version:'ver 1.6.8',summary:'公開範囲を保ち、人物詳細の表示を復元',restoredPersonDetails:true});
   if(earthquakeTitle)Object.assign(config,{id:'response-earthquake',version:'ver 1.6.9',summary:'タイトルを「地震発生」に変更',incidentTitle:'地震発生'});
   if(namedResidents)Object.assign(config,{id:'response-names',version:'ver 1.6.10',summary:'住民に自然な氏名を設定'});
-  if(townDisplayFixes)Object.assign(config,{id:'response-town-display',version:'ver 1.6.11',summary:'自町内会の吹き出しを非表示、建物詳細に建築年を表示',townDisplayFixes:true});
+  if(townDisplayFixes)Object.assign(config,{id:'response-town-display',version:'ver 1.6.11',summary:'自町内会の吹き出しを非表示、建築年と応答なしの観測例を追加',townDisplayFixes:true});
   const frame=new VisibilityFrame(config,createFrame(config)),visibility=new VisibilityController(frame,people,config.homes);
   new VisibilityOperations(frame,visibility,refreshAll);visibility.apply();if(overview)installMapOverview(frame);return frame;
 }
