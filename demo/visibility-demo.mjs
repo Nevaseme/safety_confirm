@@ -133,6 +133,7 @@ class VisibilityController{
     if(!this.frame.map.getLayer('preview-building-rating'))return;
     const stats=safetyStatistics(this.rawPeople),wanted=new Set();
     for(const region of stats){
+      if(this.frame.config.townDisplayFixes&&this.viewer.role!=='municipal'&&region.regionId===this.viewer.regionId)continue;
       const hidden=this.rawPeople.filter(p=>p.regionId===region.regionId&&!this.allowed(p.id)&&(this.frame.showSafe||!['safe','rescued'].includes(p.s)));if(!hidden.length)continue;wanted.add(region.regionId);
       let marker=this.statMarkers.get(region.regionId);
       if(!marker){const button=document.createElement('button');button.className='visibility-stat-marker';button.onclick=event=>{event.stopPropagation();this.denied();};marker=new maplibregl.Marker({element:button,anchor:'bottom'}).setLngLat((this.frame.config.townFixtures?.centers||TOWN_CENTERS)[region.regionId]).addTo(this.frame.map);this.statMarkers.set(region.regionId,marker);}
@@ -142,7 +143,7 @@ class VisibilityController{
   }
 }
 
-export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false,namedResidents=false}){
+export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false,namedResidents=false,townDisplayFixes=false}){
   class VisibilityFrame extends ListMapFrame{
     showMap(){const entering=this.page!=='map';super.showMap();if(entering&&this.visibility?.viewer.role==='municipal')this.visibility.showCityMap();}
     personById(id){return id==='p5'&&this.visibility?this.visibility.rawPeople.find(p=>p.id===id):super.personById(id);}
@@ -173,7 +174,8 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
     showHome(home){
       if(!this.visibility)return super.showHome(home);
       const linked=this.people.filter(p=>p.homeId===home.id);
-      this.openSheet(`<h2>建物の詳細</h2><p>${esc(home.name)}</p>`,`<p>建材・構造：${esc(home.material)}／${home.floors}階建</p><h3>個別に確認できる登録住民</h3>${this.rowsHTML(linked)}`);this.body.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>this.openPerson(this.personById(b.dataset.id)));
+      const attributes=this.config.townDisplayFixes?`<div class="attrs"><span><small>建築年</small>${home.built}年</span><span><small>建材・構造</small>${esc(home.material)}</span><span><small>階数</small>${home.floors}階建</span></div>`:`<p>建材・構造：${esc(home.material)}／${home.floors}階建</p>`;
+      this.openSheet(`<h2>建物の詳細</h2><p>${esc(home.name)}</p>`,`${attributes}<h3>個別に確認できる登録住民</h3>${this.rowsHTML(linked)}`);this.body.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>this.openPerson(this.personById(b.dataset.id)));
     }
     showLegend(){super.showLegend();this.body.insertAdjacentHTML('beforeend',`<h3>通報の緊急度</h3>${['高','中','低','未設定'].map(urgency=>`<div class="legend-row visibility-legend">${reportSymbol({urgency})}<span>${urgency==='未設定'?'未設定（判定前）':'緊急度 '+urgency}</span></div>`).join('')}`);}
   }
@@ -184,6 +186,7 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
   if(restoredPersonDetails)Object.assign(config,{id:'response-details',version:'ver 1.6.8',summary:'公開範囲を保ち、人物詳細の表示を復元',restoredPersonDetails:true});
   if(earthquakeTitle)Object.assign(config,{id:'response-earthquake',version:'ver 1.6.9',summary:'タイトルを「地震発生」に変更',incidentTitle:'地震発生'});
   if(namedResidents)Object.assign(config,{id:'response-names',version:'ver 1.6.10',summary:'住民に自然な氏名を設定'});
+  if(townDisplayFixes)Object.assign(config,{id:'response-town-display',version:'ver 1.6.11',summary:'自町内会の吹き出しを非表示、建物詳細に建築年を表示',townDisplayFixes:true});
   const frame=new VisibilityFrame(config,createFrame(config)),visibility=new VisibilityController(frame,people,config.homes);
   new VisibilityOperations(frame,visibility,refreshAll);visibility.apply();if(overview)installMapOverview(frame);return frame;
 }
