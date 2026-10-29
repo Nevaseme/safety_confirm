@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="referrer" content="no-referrer"><meta name="description" content="旧通信実験・Android 1.5.15の操作デモと、PWA 1.5.0の実画面を架空データで比較。">
+<meta name="referrer" content="no-referrer"><meta name="description" content="旧通信実験・共有操作と、PWA 1.5.2・Android 1.5.17の津波計算地図の実画面を比較。">
 <title>Tasukeai — 共有機能の比較</title><link rel="icon" href="data:,">
 <link rel="stylesheet" href="design.css?v=11">
 <style>
@@ -11,7 +11,7 @@
 .sharing-board{gap:28px;padding:22px 16px;justify-content:safe center;scroll-snap-type:x proximity}.sharing-view{flex:0 0 400px;scroll-snap-align:center}.sharing-view .comparison-caption{height:94px;padding:0 4px 14px}.sharing-view .comparison-label{font-size:16px}.sharing-view .comparison-summary{font-size:13px;line-height:1.7}
 .share-phone{height:auto!important;min-height:688px!important;border:1px solid #e0e6ee;border-radius:20px;overflow:hidden}.share-phone .top{height:64px}.share-phone .title{font-size:22px}.share-phone .back{font-size:30px;color:#697586;margin-right:4px}.share-content{padding:22px 22px 26px;flex:1}.share-content h2{font-size:21px;line-height:1.5;letter-spacing:-.025em;margin:0 0 22px}.share-content h3{font-size:17px;margin:0 0 7px}.share-content p{font-size:13px;line-height:1.8;margin:12px 0;color:#5b687b}.share-content label{display:block;font-size:13px;font-weight:650;margin:16px 0 6px}.share-content input{display:block;width:100%;min-width:0;height:49px;margin-top:7px;border:1px solid #bdc9d8;border-radius:10px;background:white;padding:10px 12px;color:var(--ink);font-size:15px}.share-content input[readonly]{background:#f5f7fa;color:#526277}.share-content input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}.share-content button{min-height:46px}.share-content .primary{margin-top:20px;background:var(--blue);border-radius:12px}.share-content .secondary{width:100%;margin-top:10px}.segments{display:flex;gap:9px;margin-top:18px}.segments button{border:1px solid #cad4e1;border-radius:22px;background:#fff;font-size:14px;padding:8px 17px}.segments button[aria-pressed=true]{border-color:var(--blue);color:var(--blue);background:#edf3ff}.share-note{padding:12px 14px;background:#f2f5f9;border-radius:10px;color:#4b5d75!important}.share-state{font-size:14px!important;padding:14px;border-radius:10px;background:#eaf7f2;color:#146447!important;min-height:52px}.share-state.waiting{background:#fff4df;color:#78540b!important}.role{display:inline-block;font-size:12px;padding:4px 9px;border-radius:6px;background:#edf2f8;color:#526580}.sample-code{margin-top:16px;padding:14px;border:1px solid #c9d8ec;border-radius:10px}.sample-code code{display:block;font-size:20px;letter-spacing:.07em;color:#17497e;overflow-wrap:anywhere}.share-content .text-button{border:0;background:none;color:var(--blue);padding:10px 0;text-align:left;font-size:14px}.share-bottom{border-top:1px solid var(--line);padding:13px 22px;font-size:12px;color:#6b7789;background:#fafbfd}.demo-controls{margin-top:16px;padding:15px 16px;background:#e5eaf1;border-radius:12px;font-size:13px}.demo-controls p{margin:0 0 9px;font-weight:650}.demo-controls label{display:flex;gap:9px;align-items:center;margin:9px 0;min-height:30px}.demo-controls input{width:18px;height:18px;accent-color:var(--blue)}.demo-controls button{background:none;border:0;color:#315b8b;padding:8px 0;font:inherit;text-decoration:underline;text-underline-offset:3px}.sharing-footer{max-width:856px;margin:0 auto;padding:8px 16px 32px;font-size:12px;line-height:1.8;color:#647186}.old-steps{list-style:none;counter-reset:step;padding:0;margin:18px 0}.old-steps li{counter-increment:step;display:flex;gap:10px;margin:13px 0;font-size:14px;line-height:1.6}.old-steps li:before{content:counter(step);width:23px;height:23px;border-radius:50%;background:#e8edf5;color:#5e718c;flex-shrink:0;text-align:center;font-size:12px;line-height:23px}.old-roles{display:flex;gap:7px;margin-top:20px}.old-roles span{padding:7px 12px;background:#f0f3f8;border-radius:7px;font-size:13px}.old-roles b{color:#7e8a9c;align-self:center;font-weight:400}
 @media(max-width:460px){.sharing-page{background:#edf0f5}.sharing-header{padding:21px 18px 5px}.sharing-header h1{font-size:25px}.sharing-board{padding:18px 14px;gap:18px;justify-content:flex-start}.sharing-view{flex-basis:calc(100vw - 28px)}.share-phone{min-height:670px!important}.share-content{padding:20px}.sharing-view .comparison-caption{height:104px}.sharing-footer{padding-inline:18px}}
-.sharing-header,.sharing-footer{max-width:1284px}.sharing-jump{flex-wrap:wrap;row-gap:8px}
+.sharing-header,.sharing-footer{max-width:1712px}.sharing-jump{flex-wrap:wrap;row-gap:8px}
 .screenshot-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:12px}.screenshot-tabs button{min-height:44px;padding:8px 3px;border:1px solid #d6e0e8;border-radius:8px;background:white;color:#183447;font:650 14px system-ui,sans-serif}.screenshot-tabs button[aria-pressed=true]{color:#155eef;border-color:#155eef;background:#f2f6ff}.screenshot-tabs button:focus-visible{outline:3px solid #155eef;outline-offset:2px}.pwa-screen{margin:0;background:white;border:1px solid #d6e0e8;border-radius:16px;overflow:hidden}.pwa-screen img{display:block;width:100%;height:auto}.pwa-screen figcaption{padding:12px 14px;color:#536478;font-size:12px;line-height:1.7;border-top:1px solid #d6e0e8}.pwa-link{display:block;margin-top:14px;padding:12px;color:#155eef;text-align:center;font-size:14px;text-underline-offset:3px}.pwa-screenshot-note{font-size:12px;line-height:1.7;color:#536478;margin:10px 4px}
 </style>
 </head>
@@ -19,8 +19,8 @@
 <header class="sharing-header">
  <a href="index.html">← これまでの画面比較へ</a>
  <h1>グループで記録を共有する</h1>
- <p>左の2画面は操作デモ、右はPWAの実画面です。人物・グループ・招待コードはすべて架空で、この比較ページの入力は保存・送信されません。</p>
- <nav class="sharing-jump" aria-label="比較する画面"><a href="#old-version">従来の接続</a><a href="#new-version">1.5.15 の共有操作</a><a href="#pwa-version">PWA 1.5.0 の実画面 →</a></nav>
+ <p>左の2画面は操作デモ、右の2画面はPWA・Androidの実画面です。人物・グループ・招待コードはすべて架空で、この比較ページの入力は保存・送信されません。</p>
+ <nav class="sharing-jump" aria-label="比較する画面"><a href="#old-version">従来の接続</a><a href="#new-version">1.5.15 の共有操作</a><a href="#pwa-version">PWA 1.5.0 の実画面</a><a href="#tsunami-version">津波計算地図 →</a></nav>
 </header>
 <main class="board sharing-board">
  <section class="sharing-view" id="old-version" aria-labelledby="old-label">
@@ -73,8 +73,17 @@
   <p class="pwa-screenshot-note">画像内の入力欄やボタンは操作できません。架空データでの検証時の状態を記録しています。</p>
   <a class="pwa-link" href="https://tasukeai-sync.tomodachi-takumi.workers.dev/" target="_blank" rel="noopener noreferrer">実際のPWAを開く ↗</a>
  </section>
+ <section class="sharing-view" id="tsunami-version" aria-labelledby="tsunami-label">
+  <div class="comparison-caption"><p class="comparison-label" id="tsunami-label">PWA 1.5.2・Android 1.5.17</p><p class="comparison-summary">津波地図を追加。海岸の基準地点3mのみ計算済みで、10m・20m格子の結果を比較できます。</p></div>
+  <div class="screenshot-tabs" role="group" aria-label="津波地図の実画面を選ぶ" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button type="button" data-tsunami-screen="online" aria-pressed="true">PWA</button><button type="button" data-tsunami-screen="offline" aria-pressed="false">圏外で再表示</button><button type="button" data-tsunami-screen="android" aria-pressed="false">Android</button></div>
+  <figure class="pwa-screen"><img id="tsunami-screenshot" src="assets/pwa-tsunami/online.png" width="400" height="1306" alt="実装版の熱海津波計算地図。海岸の基準地点3m、10m格子の条件計算。"><figcaption id="tsunami-screenshot-caption" aria-live="polite">通信あり · 公開PWAで読み込んだ計算結果</figcaption></figure>
+  <p class="pwa-screenshot-note">実装版を撮影した画像です。地図の操作は実際のPWAで行えます。初期水位TP0m・押し波10分の条件計算で、実際の津波予測ではありません。枠外・ほかの高さは未計算です。</p>
+  <p class="pwa-screenshot-note">圏外の画像は、通信中に開いた計算を通信オフで再表示したものです。背景地図は保存状況によって表示できない場合があります。</p>
+  <p class="pwa-screenshot-note">Android 1.5.17はエミュレーターで確認した実装画面です。実機は未更新で、住民情報を表示していません。</p>
+  <a class="pwa-link" href="https://tasukeai-sync.tomodachi-takumi.workers.dev/" target="_blank" rel="noopener noreferrer">実際のPWAで地図を見る ↗</a>
+ </section>
 </main>
-<footer class="sharing-footer">左の2画面は機能を説明するデモ、右のPWA 1.5.0は実装版のスクリーンショットです。<br>既存の <a href="index.html">Web 1.6.17 までの画面比較</a>も引き続き確認できます。</footer>
+<footer class="sharing-footer">左の2画面は機能を説明するデモ、右のPWA・Android画面は実装版のスクリーンショットです。<br>既存の <a href="index.html">Web 1.6.17 までの画面比較</a>も引き続き確認できます。</footer>
 <script>
 (() => {
  const $=id=>document.getElementById(id);let mode='join',connected=false,admin=false,timer=null;
@@ -94,6 +103,8 @@
  select('join');render();
  const screens={create:'グループ作成',join:'招待コードで参加',safety:'自分の安否',list:'メンバー一覧'};
  for(const button of document.querySelectorAll('[data-screen]'))button.onclick=()=>{const key=button.dataset.screen;for(const other of document.querySelectorAll('[data-screen]'))other.setAttribute('aria-pressed',String(other===button));$('pwa-screenshot').src=`assets/pwa-1.5.0/${key}.png`;$('pwa-screenshot').alt=`PWA 1.5.0の実装画面：${screens[key]}。架空データによる確認画面。`;$('pwa-screenshot-caption').textContent=`${screens[key]} · 実装版をブラウザーで確認した画像`;};
+ const tsunamiScreens={online:{file:'online',caption:'PWA 1.5.2 · 通信ありで読み込んだ計算結果'},offline:{file:'offline',caption:'PWA 1.5.2 · 圏外で保存済み計算を再表示'},android:{file:'android-1.5.17',caption:'Android 1.5.17 · エミュレーターでの実装画面（実機は未更新）'}};
+ for(const button of document.querySelectorAll('[data-tsunami-screen]'))button.onclick=()=>{const screen=tsunamiScreens[button.dataset.tsunamiScreen];for(const other of document.querySelectorAll('[data-tsunami-screen]'))other.setAttribute('aria-pressed',String(other===button));$('tsunami-screenshot').src=`assets/pwa-tsunami/${screen.file}.png`;$('tsunami-screenshot').alt=`${screen.caption}。熱海津波計算地図、海岸の基準地点3m、10m格子。`;$('tsunami-screenshot-caption').textContent=screen.caption;};
 })();
 </script>
 </body></html>
