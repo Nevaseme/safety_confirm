@@ -89,6 +89,19 @@ test('usual places do not expand known SOS, safe or rescued disclosure and remai
   const without=projectPerson(unknown,viewer,timing,{usualPlaces:true});
   assert.equal(without.address,unknown.address);assert.ok(!('daytimePlace' in without));
 });
+test('1.6.15 hides both observations only while safe, regardless of position, without deleting records',()=>{
+  for(const source of [sos,unknown]){
+    const person={...source,s:'safe',impact:true,enclosed:true,impactAt:'14:32',enclosedAt:'14:33'};
+    const baseline=projectPerson(person,viewer,timing,{usualPlaces:true});
+    const hidden=projectPerson(person,viewer,timing,{usualPlaces:true,hideSafeObservations:true});
+    for(const key of ['impact','enclosed','impactAt','enclosedAt']){assert.ok(!(key in hidden));delete baseline[key];}
+    assert.deepEqual(hidden,baseline);assert.equal(person.impact,true);assert.equal(person.enclosed,true);
+    for(const state of ['sos','unanswered','rescued']){
+      person.s=state;
+      assert.deepEqual(projectPerson(person,viewer,timing,{usualPlaces:true,hideSafeObservations:true}),projectPerson(person,viewer,timing,{usualPlaces:true}));
+    }
+  }
+});
 test('non-SOS reports remain global and citizens see reporter address without identity',()=>{
   const projected=projectReport(report,viewer,[],timing);
   assert.equal(projected.description,'倒木');assert.deepEqual(projected.reporter,{address:'架空町456-2'});

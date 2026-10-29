@@ -25,10 +25,11 @@ export function canSeePerson(person,viewer,timing){
   const start=disclosureStart(timing);
   return person.s!=='unanswered'||(start!==null&&timing.now>=start+180000);
 }
-export function projectPerson(person,viewer,timing,{usualPlaces=false}={}){
+export function projectPerson(person,viewer,timing,{usualPlaces=false,hideSafeObservations=false}={}){
   if(!canSeePerson(person,viewer,timing))return null;
   const fields=['id','s','regionId','location','acquiredAt','accuracy','answeredAt','memo','impact','enclosed','impactAt','enclosedAt','history','priorSafety'];
   const output=Object.fromEntries(fields.filter(k=>person[k]!==undefined).map(k=>[k,person[k]]));
+  if(hideSafeObservations&&person.s==='safe')for(const key of ['impact','enclosed','impactAt','enclosedAt'])delete output[key];
   output.name=['safe','rescued'].includes(person.s)?'':person.name||(person.id==='p5'?'自分':'登録住民');
   if(!hasPosition(person)||(usualPlaces&&person.s==='unanswered')){
     for(const k of ['address','homeId','bedroom'])if(person[k]!==undefined)output[k]=person[k];
