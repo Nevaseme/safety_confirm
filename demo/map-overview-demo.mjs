@@ -33,7 +33,7 @@ export function installMapOverview(frame){
   }
   function showTownDetails(id){
     const item=summary(id),rows=ops.visible(ops.cases.filter(r=>!r.cancelled&&r.regionIds.includes(id)));
-    frame.openSheet(`<h2>${esc(item.name)}の詳細</h2>`,`<h3>資材の不足分</h3>${item.shortages.length?`<dl class="town-materials">${item.shortages.map(m=>`<div><dt>${esc(m.name)}</dt><dd>${m.quantity}<small>${esc(m.unit)}</small></dd></div>`).join('')}</dl>`:'<p class="quiet">不足の記録はありません。</p>'}<h3>閲覧できる通報</h3>${ops.rowsHTML(rows)}${view.viewer.role==='municipal'||view.viewer.regionId!==id?'<p class="visibility-note">安否の個人情報は表示しません。</p>':''}`,'<button class="secondary full" data-town-back>町内会の要約に戻る</button>');
+    frame.openSheet(`<h2>${esc(item.name)}の詳細</h2>`,`<h3>資材の不足分</h3>${item.shortages.length?`<dl class="town-materials">${item.shortages.map(m=>`<div><dt translate="no">${esc(m.name)}</dt><dd>${m.quantity}<small translate="no">${esc(m.unit)}</small></dd></div>`).join('')}</dl>`:'<p class="quiet">不足の記録はありません。</p>'}<h3>閲覧できる通報</h3>${ops.rowsHTML(rows)}${view.viewer.role==='municipal'||view.viewer.regionId!==id?'<p class="visibility-note">安否の個人情報は表示しません。</p>':''}`,'<button class="secondary full" data-town-back>町内会の要約に戻る</button>');
     frame.body.querySelectorAll('[data-case]').forEach(button=>button.onclick=()=>ops.openCase(button.dataset.case));
     frame.footer.querySelector('[data-town-back]').onclick=()=>showTown(id);
   }

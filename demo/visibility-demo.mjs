@@ -1,9 +1,9 @@
-import {installMapOverview} from './map-overview-demo.mjs?v=4';
+import {installMapOverview} from './map-overview-demo.mjs?v=5';
 import {createTownFixtures} from './town-fixtures.mjs?v=4';
-import {OperationsDemo} from './operations-demo.mjs?v=5';
+import {OperationsDemo} from './operations-demo.mjs?v=6';
 import {REGIONS,regionName,filterCases,summarizeCases} from './operations-model.mjs?v=4';
 import {STATES,NOW,hasPosition,buildIndex} from './clustering.mjs?v=7';
-import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectMapPerson,projectReport,visibilityCsv,statisticsCsv,safetyStatistics,reportIcon,viewingScope,municipalMapBounds,TOWN_CENTERS} from './visibility-model.mjs?v=6';
+import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectMapPerson,projectReport,visibilityCsv,statisticsCsv,safetyStatistics,reportIcon,viewingScope,municipalMapBounds,TOWN_CENTERS} from './visibility-model.mjs?v=7';
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icon=name=>`<i class="ph-fill ph-${name}" aria-hidden="true"></i>`;
@@ -71,14 +71,14 @@ class VisibilityOperations extends OperationsDemo{
   renderSummary(){
     super.renderSummary();this.panel.querySelector('.ops-subhead').insertAdjacentHTML('afterend',this.visibility.statisticsHTML());
     this.panel.querySelector('.ops-summary-note').textContent='件数から、閲覧できる通報の詳細を開きます。安否の非公開対象は統計だけを表示します。';
-    const button=document.createElement('button');button.className='ops-csv';button.textContent='安否の統計をCSVで書き出す';button.onclick=()=>saveCsv(statisticsCsv(this.people),'PlanD-demo-safety-statistics.csv');this.panel.append(button);
+    const button=document.createElement('button');button.className='ops-csv';button.textContent='安否の統計をCSVで書き出す';button.onclick=()=>saveCsv(statisticsCsv(this.people,this.frame.language?.t),'PlanD-demo-safety-statistics.csv');this.panel.append(button);
   }
   renderDrill(){
     const {regionId,type}=this.route,summary=summarizeCases(this.cases,regionId,type),raw=summary.ids.map(id=>this.find(id)),visible=this.visible(raw);
     this.panel.innerHTML=`<div class="ops-subhead"><button class="ops-back" data-back>地域集計に戻る</button><h2>${esc(regionId==='all'?'全地域':regionName(regionId))}</h2><p>${esc(type||'すべての種類')} ${summary.total}件</p>${visible.length<raw.length?'<p class="visibility-note">安否の個別情報は、閲覧できる対象だけを表示します。</p>':''}</div><div class="ops-case-list">${this.rowsHTML(visible)}</div><button class="ops-csv" data-csv>閲覧できる通報をCSVで書き出す</button>`;
     this.panel.querySelector('[data-back]').onclick=()=>this.showSummary();this.panel.querySelector('[data-csv]').onclick=()=>this.downloadCsv(raw);this.bindRows();
   }
-  downloadCsv(rows){if(!this.visibility)return super.downloadCsv(rows);saveCsv(visibilityCsv(rows,this.visibility.viewer,this.people,this.visibility.timing()),'PlanD-demo-visible-reports.csv');this.frame.toast('閲覧できる通報をCSVに書き出しました');}
+  downloadCsv(rows){if(!this.visibility)return super.downloadCsv(rows);saveCsv(visibilityCsv(rows,this.visibility.viewer,this.people,this.visibility.timing(),this.frame.language?.t),'PlanD-demo-visible-reports.csv');this.frame.toast('閲覧できる通報をCSVに書き出しました');}
 }
 
 class VisibilityController{
@@ -145,7 +145,7 @@ class VisibilityController{
   }
 }
 
-export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false,namedResidents=false,townDisplayFixes=false,restoredListFields=false,usualPlaces=false,allSafetyPatterns=false,hideSafeObservations=false,anonymousWaitingMap=false}){
+export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false,namedResidents=false,townDisplayFixes=false,restoredListFields=false,usualPlaces=false,allSafetyPatterns=false,hideSafeObservations=false,anonymousWaitingMap=false,languageSettings=false}){
   class VisibilityFrame extends ListMapFrame{
     showMap(){const entering=this.page!=='map';super.showMap();if(entering&&this.visibility?.viewer.role==='municipal')this.visibility.showCityMap();}
     personById(id){return id==='p5'&&this.visibility?this.visibility.rawPeople.find(p=>p.id===id):super.personById(id);}
@@ -163,12 +163,12 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
     showSafety(){super.showSafety();if(this.visibility){const note=document.createElement('p');note.className='visibility-note';note.textContent='このデモで自分の安否を記録する利用者は、架空の東町内会に所属しています。';this.phone.querySelector('.safety-page h2').after(note);}}
     refreshList(){
       if(!this.visibility||this.page!=='people')return super.refreshList();
-      if(this.visibility.viewer.role==='municipal'){this.peoplePage.innerHTML='<div class="people-heading"><h2 tabindex="-1">安否統計</h2></div>'+this.visibility.statisticsHTML()+'<p class="visibility-note">自治体職員には安否の統計だけを表示します。</p><button class="ops-csv" data-statistics-csv>安否の統計をCSVで書き出す</button>';this.peoplePage.querySelector('[data-statistics-csv]').onclick=()=>saveCsv(statisticsCsv(this.visibility.rawPeople),'PlanD-demo-safety-statistics.csv');return;}
+      if(this.visibility.viewer.role==='municipal'){this.peoplePage.innerHTML='<div class="people-heading"><h2 tabindex="-1">安否統計</h2></div>'+this.visibility.statisticsHTML()+'<p class="visibility-note">自治体職員には安否の統計だけを表示します。</p><button class="ops-csv" data-statistics-csv>安否の統計をCSVで書き出す</button>';this.peoplePage.querySelector('[data-statistics-csv]').onclick=()=>saveCsv(statisticsCsv(this.visibility.rawPeople,this.language?.t),'PlanD-demo-safety-statistics.csv');return;}
       super.refreshList();this.peoplePage.querySelector('.people-heading p').textContent='個別に確認できる人';
       if(this.config.restoredListFields)for(const row of this.peoplePage.querySelectorAll('.people-rows [data-id]')){
         const p=this.people.find(person=>person.id===row.dataset.id),detail=row.querySelector('small');
         if(hasPosition(p))detail.textContent+=`・位置更新 ${Math.max(0,Math.round((NOW-p.acquiredAt)/60000))}分前`;
-        else detail.innerHTML+=`<br>寝室：${esc(p.bedroom||'未登録')}`;
+        else detail.innerHTML+=`<br>寝室：<span translate="no">${esc(p.bedroom||'未登録')}</span>`;
       }
       this.peoplePage.insertAdjacentHTML('afterbegin',this.visibility.statisticsHTML());
       if(this.visibility.viewer.role==='municipal')this.peoplePage.insertAdjacentHTML('beforeend','<p class="visibility-note">自治体職員には安否の統計だけを表示します。</p>');
@@ -185,13 +185,13 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
     }
     rowsHTML(list){
       if(!this.visibility)return super.rowsHTML(list);
-      return list.length?list.map(p=>`<button class="person-row" data-id="${esc(p.id)}">${symbol(p)}<span class="row-content"><strong>${esc(personLabel(p))}</strong><small>${hasPosition(p)?labels[p.s]:`位置不明・${esc(p.address||'住所未登録')}`}</small></span>${icon('caret-right')}</button>`).join(''):'<p class="empty-list">個別に表示できる人はいません。</p>';
+      return list.length?list.map(p=>`<button class="person-row" data-id="${esc(p.id)}">${symbol(p)}<span class="row-content"><strong ${p.name?'translate="no"':''}>${esc(personLabel(p))}</strong><small>${hasPosition(p)?labels[p.s]:`位置不明・${esc(p.address||'住所未登録')}`}</small></span>${icon('caret-right')}</button>`).join(''):'<p class="empty-list">個別に表示できる人はいません。</p>';
     }
     showHome(home){
       if(!this.visibility)return super.showHome(home);
       const linked=this.people.filter(p=>p.homeId===home.id);
       const attributes=this.config.townDisplayFixes?`<div class="attrs"><span><small>建築年</small>${home.built}年</span><span><small>建材・構造</small>${esc(home.material)}</span><span><small>階数</small>${home.floors}階建</span></div>`:`<p>建材・構造：${esc(home.material)}／${home.floors}階建</p>`;
-      this.openSheet(`<h2>建物の詳細</h2><p>${esc(home.name)}</p>`,`${attributes}<h3>個別に確認できる登録住民</h3>${this.rowsHTML(linked)}`);this.body.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>this.openPerson(this.personById(b.dataset.id)));
+      this.openSheet(`<h2>建物の詳細</h2><p translate="no">${esc(home.name)}</p>`,`${attributes}<h3>個別に確認できる登録住民</h3>${this.rowsHTML(linked)}`);this.body.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>this.openPerson(this.personById(b.dataset.id)));
     }
     showLegend(){super.showLegend();this.body.insertAdjacentHTML('beforeend',`<h3>通報の緊急度</h3>${['高','中','低','未設定'].map(urgency=>`<div class="legend-row visibility-legend">${reportSymbol({urgency})}<span>${urgency==='未設定'?'未設定（判定前）':'緊急度 '+urgency}</span></div>`).join('')}`);}
   }
@@ -211,6 +211,7 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
   if(allSafetyPatterns)Object.assign(config,{id:'response-safety-patterns',version:'ver 1.6.14',summary:'安否×位置の8パターンと、衝撃・閉所の両検知例を用意',allSafetyPatterns:true});
   if(hideSafeObservations)Object.assign(config,{id:'response-safe-display',version:'ver 1.6.15',summary:'無事の検知表示を省き、初期設定を4分後に変更',hideSafeObservations:true});
   if(anonymousWaitingMap)Object.assign(config,{id:'response-waiting-map',version:'ver 1.6.16',summary:'3分未満も応答なしの位置・検知を表示し、人物詳細は非公開',anonymousWaitingMap:true});
+  if(languageSettings)Object.assign(config,{id:'response-language',version:'ver 1.6.17',summary:'設定から日本語・英語を切り替え'});
   const frame=new VisibilityFrame(config,createFrame(config)),visibility=new VisibilityController(frame,people,config.homes);
   new VisibilityOperations(frame,visibility,refreshAll);visibility.apply();if(overview)installMapOverview(frame);return frame;
 }

@@ -60,15 +60,15 @@ export function safetyStatistics(people){
   return REGIONS.filter(r=>r.depth===2).map(region=>({regionId:region.id,name:region.name,counts:Object.fromEntries(STATES.map(s=>[s,people.filter(p=>p.regionId===region.id&&p.s===s).length]))}));
 }
 const quote=value=>{let s=String(value??'');if(/^\s*[=+@-]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';};
-export function visibilityCsv(rows,viewer,people,timing){
+export function visibilityCsv(rows,viewer,people,timing,t=value=>value){
   const header=['地域','対象ID','種別','氏名・対象','対応状況','緊急度','担当の活動名','対応結果','内容','通報者の住所','通報者氏名','必要資材','更新日時'];
   const values=rows.filter(r=>!r.cancelled).map(r=>projectReport(r,viewer,people,timing)).filter(Boolean).map(r=>[
-    r.regionIds?.map(id=>REGIONS.find(g=>g.id===id)?.name||id).join('／'),r.id,caseCategory(r.category),r.title,r.status,r.urgency,r.assignees?.map(memberName).join('／'),r.result,r.description,r.reporter?.address,r.reporter?.name,
-    r.materials?.map(m=>`${m.name} 必要${m.needed}${m.unit}・手配済み${m.arranged}${m.unit}・不足${Math.max(0,m.needed-m.arranged)}${m.unit}`).join('／'),r.updatedAt
+    r.regionIds?.map(id=>t(REGIONS.find(g=>g.id===id)?.name||id)).join('／'),r.id,t(caseCategory(r.category)),r.title,t(r.status),t(r.urgency,'urgency'),r.assignees?.map(id=>t(memberName(id))).join('／'),r.result,r.description,r.reporter?.address,r.reporter?.name,
+    r.materials?.map(m=>`${m.name} ${t('必要')}${m.needed}${m.unit}・${t('手配済み')}${m.arranged}${m.unit}・${t('不足')}${Math.max(0,m.needed-m.arranged)}${m.unit}`).join('／'),r.updatedAt
   ]);
-  return '\uFEFF'+[header,...values].map(line=>line.map(quote).join(',')).join('\r\n')+'\r\n';
+  return '\uFEFF'+[header.map(v=>t(v)),...values].map(line=>line.map(quote).join(',')).join('\r\n')+'\r\n';
 }
-export function statisticsCsv(people){
-  return '\uFEFF'+[['町内会','SOS','反応なし','無事','救助済み'],...safetyStatistics(people).map(r=>[r.name,...STATES.map(s=>r.counts[s])])].map(row=>row.map(quote).join(',')).join('\r\n')+'\r\n';
+export function statisticsCsv(people,t=value=>value){
+  return '\uFEFF'+[['町内会','SOS','反応なし','無事','救助済み'].map(v=>t(v)),...safetyStatistics(people).map(r=>[t(r.name),...STATES.map(s=>r.counts[s])])].map(row=>row.map(quote).join(',')).join('\r\n')+'\r\n';
 }
 export const reportIcon=urgency=>urgency==='高'?'assets/report-emergency.png':['中','低'].includes(urgency)?'assets/report-normal.png':null;

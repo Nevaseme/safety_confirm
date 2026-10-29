@@ -1,0 +1,21 @@
+.language-setting{border:0;margin:0;padding:0;min-width:0}
+.language-setting legend{font-size:16px;font-weight:750;margin-bottom:16px}
+.language-setting label{display:flex;justify-content:space-between;align-items:center;min-height:58px;padding:12px 16px;border:1px solid var(--line);border-radius:12px;margin:10px 0;cursor:pointer}
+.language-setting label:has(:checked){border-color:var(--blue);background:#f2f6ff}
+.language-setting input{width:22px;height:22px;accent-color:var(--blue)}
+.phone:lang(en) .nav button{font-size:13px;line-height:1.2;min-width:0}
+.phone:lang(en) .toggle-label{font-size:13px;gap:6px;max-width:52%}
+.phone:lang(en) .toggle-label .switch{flex-shrink:0}
+.phone:lang(en) .unknown{font-size:12px}
+.phone:lang(en) .sheet h2{font-size:23px;line-height:1.3;overflow-wrap:anywhere}
+.phone:lang(en) .ops-filters button{font-size:12px;white-space:normal;min-width:0}
+.phone:lang(en) .ops-detail-buttons{grid-template-columns:1fr 1fr}
+.phone:lang(en) .ops-detail-buttons button{white-space:normal;font-size:13px;min-height:48px;line-height:1.3}
+.phone:lang(en) .visibility-toolbar button{white-space:normal;text-align:left;line-height:1.25;max-width:72%}
+.phone:lang(en) .visibility-toolbar [data-demo-clock]{white-space:nowrap}
+.phone:lang(en) .visibility-statistics table{min-width:420px}
+.phone:lang(en) .town-safety-counts dt{font-size:13px}
+.phone:lang(en) .observation b{font-size:14px;line-height:1.35}
+.phone:lang(en) .ops-summary{min-width:550px}
+.phone:lang(en) .ops-type-label,.phone:lang(en) .ops-work-state{overflow-wrap:anywhere}
+.phone:lang(en) .ops-region-button{font-size:13px;max-width:108px;white-space:normal;line-height:1.3}

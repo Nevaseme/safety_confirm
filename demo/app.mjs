@@ -2,8 +2,9 @@ import {STATES,CENTER,NOW,CLUSTER_END_ZOOM,hasPosition,buildIndex,getNodes,displ
 import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
-import {OperationsDemo} from './operations-demo.mjs?v=5';
-import {mountVisibilityDemo} from './visibility-demo.mjs?v=19';
+import {OperationsDemo} from './operations-demo.mjs?v=6';
+import {mountVisibilityDemo} from './visibility-demo.mjs?v=20';
+import {installLanguageSettings} from './language.mjs?v=1';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -19,7 +20,7 @@ const config={zoom:query.get('view')==='wide'?14.2:16.8};
 
 function createFrame(config){
   const section=document.createElement('section');section.className='view';
-  section.hidden=!['response-town-display','response-list-fields','response-usual-places','response-safety-patterns','response-safe-display','response-waiting-map'].includes(config.id);
+  section.hidden=!['response-town-display','response-list-fields','response-usual-places','response-safety-patterns','response-safe-display','response-waiting-map','response-language'].includes(config.id);
   section.innerHTML=`<header class="comparison-caption"><h1 class="comparison-label">${escape(config.version)}</h1>${config.summary?`<p class="comparison-summary">${escape(config.summary)}</p>`:''}</header><article class="phone ${config.enhanced?'enhanced':''}" id="${config.id}-screen">
   <header class="top"><button class="plain menu" aria-label="メニュー">${icon('list')}</button>${config.enhanced?'<div class="incident-heading"><span class="title">地震発生</span><span class="incident-date">10月21日 14:32 ・ <span data-elapsed>28分前</span></span></div>':'<span class="title">地震発生</span><span class="date">10月21日</span>'}</header>
   <div class="tools"><label class="toggle-label">無事を表示<button class="switch" role="switch" aria-label="無事を表示" aria-checked="true"></button></label><button class="unknown">${icon('user')}位置不明 ${people.filter(p=>!hasPosition(p)).length}人${icon('caret-right')}</button></div>
@@ -126,11 +127,11 @@ class MapFrame{
     this.selected=p.id;this.render();
     const home=this.homeById(p.homeId),needsHelp=['sos','unanswered'].includes(p.s);
     let location=hasPosition(p)?`${time(p.acquiredAt)}取得・${age(p)}・精度 約${p.accuracy}m`:'未受信';
-    const title=`<div class="person-title">${symbol(p.s)}<div><h2>${escape(personLabel(p))}</h2><div class="person-state ${p.s}">${stateText(p)}${p.s==='sos'?`・${p.answeredAt}の回答`:''}</div></div></div><p class="location-line">${icon('map-pin')}最後のスマホ位置　${location}</p>`;
-    let body=p.s==='sos'&&p.memo?`<h3>SOSメモ</h3><p class="sos-note">${escape(p.memo)}</p>`:'';
+    const title=`<div class="person-title">${symbol(p.s)}<div><h2 ${p.name?'translate="no"':''}>${escape(personLabel(p))}</h2><div class="person-state ${p.s}">${stateText(p)}${p.s==='sos'?`・${p.answeredAt}の回答`:''}</div></div></div><p class="location-line">${icon('map-pin')}最後のスマホ位置　${location}</p>`;
+    let body=p.s==='sos'&&p.memo?`<h3>SOSメモ</h3><p class="sos-note" translate="no">${escape(p.memo)}</p>`:'';
     if(needsHelp){
-      if(showResidence)body+=`<h3>普段の住居・寝室</h3><div class="home-row"><strong>${home.name}</strong><button class="link-button" data-action="home">建物を見る ${icon('caret-right')}</button></div><div class="room">${icon('bed')}<span>${escape(p.bedroom)}</span></div><div class="attrs"><span><small>築年数</small>築${2026-home.built}年</span><span><small>建材・構造</small>${home.material}</span><span><small>階数</small>${home.floors}階建</span></div>`;
-      if(showResidence&&showDaytimePlace)body+=`<h3>普段昼間いる場所</h3><p>${escape(p.daytimePlace||'未登録')}</p>`;
+      if(showResidence)body+=`<h3>普段の住居・寝室</h3><div class="home-row"><strong translate="no">${escape(home.name)}</strong><button class="link-button" data-action="home">建物を見る ${icon('caret-right')}</button></div><div class="room">${icon('bed')}<span translate="no">${escape(p.bedroom)}</span></div><div class="attrs"><span><small>築年数</small>築${2026-home.built}年</span><span><small>建材・構造</small>${home.material}</span><span><small>階数</small>${home.floors}階建</span></div>`;
+      if(showResidence&&showDaytimePlace)body+=`<h3>普段昼間いる場所</h3><p translate="no">${escape(p.daytimePlace||'未登録')}</p>`;
     }
     if((needsHelp||showPastObservations)&&(p.impact||p.enclosed))body+=`<h3>スマホの観測</h3><div class="observations">${p.impact?`<div class="observation">${sensor('impact',true)}<div><b>衝撃あり</b><small>10/21 ${p.impactAt}</small></div></div>`:''}${p.enclosed?`<div class="observation">${sensor('enclosed',true)}<div><b>閉所を検知</b><small>10/21 ${p.enclosedAt}</small></div></div>`:''}</div>`;
     body+=`<button class="history-summary" aria-expanded="${p.s==='rescued'}">救助・確認の記録 ${p.history.length}件 ${icon('caret-down')}</button><div class="history" ${p.s==='rescued'?'':'hidden'}>${this.historyHTML(p)}</div>`;
@@ -141,7 +142,7 @@ class MapFrame{
     this.footer.querySelector('[data-action=rescue]')?.addEventListener('click',()=>this.rescueForm(actionPerson));
     this.footer.querySelector('[data-action=correct]')?.addEventListener('click',()=>this.correctForm(actionPerson));
   }
-  historyHTML(p){return p.history.length?p.history.slice().reverse().map(h=>`<div class="history-entry"><strong>${h.action}</strong><small>10/21 ${h.time}　記録者：${h.author}</small><p>${escape(h.text)}</p></div>`).join(''):'<p class="quiet">記録はまだありません。</p>';}
+  historyHTML(p){return p.history.length?p.history.slice().reverse().map(h=>`<div class="history-entry"><strong>${h.action}</strong><small>10/21 ${h.time}　記録者：${h.author}</small><p translate="no">${escape(h.text)}</p></div>`).join(''):'<p class="quiet">記録はまだありません。</p>';}
   rescueForm(p){
     this.openSheet(`<h2>救助の記録</h2>`,`<div class="legend-row">${symbol(p.s)}<strong>${escape(personLabel(p))}</strong></div><label class="form-label" for="${this.config.id}-rescue-note">対応メモ（任意）</label><textarea id="${this.config.id}-rescue-note" placeholder="例：玄関前で本人を確認。屋外へ移動済み。"></textarea><p class="quiet">記録者：自分　10月21日 15:00</p>`,`<button class="primary" data-action="save">${icon('check-fat')}救助済みで保存</button>`);
     this.footer.querySelector('[data-action=save]').onclick=()=>{const note=this.body.querySelector('textarea').value.trim();p.priorSafety=p.s;p.s='rescued';p.history.push({time:'15:00',author:'自分',text:note||'本人の救助を確認。',action:'救助済み'});refreshAll();this.openPerson(p);this.toast('救助済みを記録しました');};
@@ -332,7 +333,7 @@ class ListMapFrame extends MapFrame{
     if(this.areaOpen)this.returnArea={ids:[...this.areaIds],key:this.areaKey,filter:this.areaFilter};
     if(!hasPosition(p)){
       const home=this.homeById(p.homeId);
-      this.openSheet(`<h2>${escape(personLabel(p))}</h2><p class="location-line">位置不明${p.acquiredAt?' ・ 3日以上更新なし':''}</p>`,`<h3>普段の住居・寝室</h3><div class="home-row"><strong>${escape(home.name)}</strong><button class="link-button" data-home>建物を見る ${icon('caret-right')}</button></div><div class="room">${icon('bed')}<span>${escape(p.bedroom)}</span></div>`);
+      this.openSheet(`<h2 ${p.name?'translate="no"':''}>${escape(personLabel(p))}</h2><p class="location-line">位置不明${p.acquiredAt?' ・ 3日以上更新なし':''}</p>`,`<h3>普段の住居・寝室</h3><div class="home-row"><strong>${escape(home.name)}</strong><button class="link-button" data-home>建物を見る ${icon('caret-right')}</button></div><div class="room">${icon('bed')}<span translate="no">${escape(p.bedroom)}</span></div>`);
       this.body.querySelector('[data-home]').onclick=()=>this.showHome(home,p);
     }else super.openPerson(p);
     if(this.returnArea)this.head.querySelector('.sheet-close').setAttribute('aria-label','エリアの一覧に戻る');
@@ -402,3 +403,8 @@ if(query.get('demo')==='safe-display'||location.hash==='#response-safe-display-d
 const waitingMapFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true,wideAreaClusters:true,correctedTowns:true,restoredPersonDetails:true,earthquakeTitle:true,namedResidents:true,townDisplayFixes:true,restoredListFields:true,usualPlaces:true,allSafetyPatterns:true,hideSafeObservations:true,anonymousWaitingMap:true});
 frames.push(waitingMapFrame);
 if(query.get('demo')==='waiting-map'||location.hash==='#response-waiting-map-demo')requestAnimationFrame(()=>waitingMapFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+
+const languageFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true,wideAreaClusters:true,correctedTowns:true,restoredPersonDetails:true,earthquakeTitle:true,namedResidents:true,townDisplayFixes:true,restoredListFields:true,usualPlaces:true,allSafetyPatterns:true,hideSafeObservations:true,anonymousWaitingMap:true,languageSettings:true});
+frames.push(languageFrame);
+installLanguageSettings(languageFrame);
+if(query.get('demo')==='language'||location.hash==='#response-language-demo')requestAnimationFrame(()=>languageFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
