@@ -3,7 +3,7 @@ import {createTownFixtures} from './town-fixtures.mjs?v=4';
 import {OperationsDemo} from './operations-demo.mjs?v=5';
 import {REGIONS,regionName,filterCases,summarizeCases} from './operations-model.mjs?v=4';
 import {STATES,NOW,hasPosition,buildIndex} from './clustering.mjs?v=7';
-import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectReport,visibilityCsv,statisticsCsv,safetyStatistics,reportIcon,viewingScope,municipalMapBounds,TOWN_CENTERS} from './visibility-model.mjs?v=5';
+import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectMapPerson,projectReport,visibilityCsv,statisticsCsv,safetyStatistics,reportIcon,viewingScope,municipalMapBounds,TOWN_CENTERS} from './visibility-model.mjs?v=6';
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icon=name=>`<i class="ph-fill ph-${name}" aria-hidden="true"></i>`;
@@ -101,7 +101,8 @@ class VisibilityController{
   ready(){const t=this.timing(),start=disclosureStart(t);return start!==null&&t.now>=start+180000;}
   allowed(id){const p=this.rawPeople.find(p=>p.id===id);return p&&canSeePerson(p,this.viewer,this.timing());}
   projectPeople(){return this.rawPeople.map(p=>projectPerson(p,this.viewer,this.timing(),{usualPlaces:this.frame.config.usualPlaces,hideSafeObservations:this.frame.config.hideSafeObservations})).filter(Boolean);}
-  refreshPeople(){this.frame.config.people=this.projectPeople();this.frame.index=buildIndex(Supercluster,this.frame.people,this.frame.showSafe,this.frame.clusterEndZoom);this.frame.revision++;this.frame.render();this.frame.refreshList?.();}
+  projectMapPeople(){return this.rawPeople.map(p=>projectMapPerson(p,this.viewer,this.timing(),{usualPlaces:this.frame.config.usualPlaces,hideSafeObservations:this.frame.config.hideSafeObservations,anonymousWaitingMap:true})).filter(Boolean);}
+  refreshPeople(){this.frame.refreshSource();this.frame.index=buildIndex(Supercluster,this.frame.mapPeople,this.frame.showSafe,this.frame.clusterEndZoom);this.frame.revision++;this.frame.render();this.frame.refreshList?.();}
   updateToolbar(){const sec=Math.max(0,Math.floor((this.timing().now-(disclosureStart(this.clock)??NOW))/1000));this.toolbar.querySelector('button').textContent=`${roles[this.viewer.role]}・${viewingScope(this.viewer).label}`;this.toolbar.querySelector('[data-demo-clock]').textContent=`経過 ${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;}
   apply(){
     this.lastReady=this.ready();this.updateToolbar();this.ops?.setRole();this.refreshPeople();
@@ -124,6 +125,7 @@ class VisibilityController{
       this.clock={eewReceivedAt:this.scenario==='report-only'?null:NOW+(this.scenario==='report'?30000:0),firstReportedAt:this.scenario==='eew-only'?null:NOW+(this.scenario==='eew'?30000:0)};
       this.elapsed=Number(data.get('demo-elapsed'));this.startedAt=Date.now();this.frame.closeSheet();this.apply();if(this.frame.page==='map'){if(this.viewer.role==='municipal')this.showCityMap();else if(this.frame.config.townFixtures)this.showTownMap(this.viewer.regionId);}
     },'表示を切り替える');
+    if(this.frame.config.anonymousWaitingMap)for(const note of this.frame.body.querySelectorAll('.visibility-note'))if(note.textContent.startsWith('3分間は'))note.textContent='3分未満も、同じ町内会の応答なしの位置・衝撃・閉所検知を地図に表示します。人物の詳細は3分後に表示します。他の町内会・自治体職員には安否の統計だけを表示します。';
     this.frame.body.querySelector('[data-later-trigger]').onclick=()=>{const at=this.timing().now;recordTrigger(this.clock,'eewReceivedAt',at);recordTrigger(this.clock,'firstReportedAt',at);this.frame.toast('追加分を受信しました。3分の起点は変わりません。');};
     const role=this.frame.body.querySelector('[name=viewer-role]'),region=this.frame.body.querySelector('[name=viewer-region]');
     const updateScope=()=>{const municipal=role.value==='municipal';this.frame.body.querySelector('[data-resident-region]').hidden=municipal;region.disabled=municipal;this.frame.body.querySelector('[data-city-scope]').hidden=!municipal;};
@@ -143,11 +145,20 @@ class VisibilityController{
   }
 }
 
-export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false,namedResidents=false,townDisplayFixes=false,restoredListFields=false,usualPlaces=false,allSafetyPatterns=false,hideSafeObservations=false}){
+export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false,namedResidents=false,townDisplayFixes=false,restoredListFields=false,usualPlaces=false,allSafetyPatterns=false,hideSafeObservations=false,anonymousWaitingMap=false}){
   class VisibilityFrame extends ListMapFrame{
     showMap(){const entering=this.page!=='map';super.showMap();if(entering&&this.visibility?.viewer.role==='municipal')this.visibility.showCityMap();}
     personById(id){return id==='p5'&&this.visibility?this.visibility.rawPeople.find(p=>p.id===id):super.personById(id);}
-    refreshSource(){if(this.visibility)this.config.people=this.visibility.projectPeople();}
+    refreshSource(){if(this.visibility){this.config.people=this.visibility.projectPeople();if(this.config.anonymousWaitingMap)this.config.mapPeople=this.visibility.projectMapPeople();}}
+    openMapPerson(p){
+      if(p?.mapDisclosurePending&&!this.visibility.allowed(p.id)){this.openSheet('<h2>応答なし</h2>','<p>3分経過後に人物の詳細を表示します。</p>');return;}
+      super.openMapPerson(p);
+    }
+    paintArea(){
+      super.paintArea();
+      const pending=this.mapPeople.filter(p=>p.mapDisclosurePending&&this.areaIds.includes(p.id)).length;
+      if(pending)this.body.insertAdjacentHTML('afterbegin',`<p class="visibility-note">ほかに応答なし${pending}人。人物の詳細は3分経過後に表示します。</p>`);
+    }
     render(){super.render();this.visibility?.drawStatisticsMarkers();}
     showSafety(){super.showSafety();if(this.visibility){const note=document.createElement('p');note.className='visibility-note';note.textContent='このデモで自分の安否を記録する利用者は、架空の東町内会に所属しています。';this.phone.querySelector('.safety-page h2').after(note);}}
     refreshList(){
@@ -199,6 +210,7 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
   }
   if(allSafetyPatterns)Object.assign(config,{id:'response-safety-patterns',version:'ver 1.6.14',summary:'安否×位置の8パターンと、衝撃・閉所の両検知例を用意',allSafetyPatterns:true});
   if(hideSafeObservations)Object.assign(config,{id:'response-safe-display',version:'ver 1.6.15',summary:'無事の検知表示を省き、初期設定を4分後に変更',hideSafeObservations:true});
+  if(anonymousWaitingMap)Object.assign(config,{id:'response-waiting-map',version:'ver 1.6.16',summary:'3分未満も応答なしの位置・検知を表示し、人物詳細は非公開',anonymousWaitingMap:true});
   const frame=new VisibilityFrame(config,createFrame(config)),visibility=new VisibilityController(frame,people,config.homes);
   new VisibilityOperations(frame,visibility,refreshAll);visibility.apply();if(overview)installMapOverview(frame);return frame;
 }

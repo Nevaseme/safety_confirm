@@ -3,7 +3,7 @@ import {people,homes,personLabel} from './data.mjs?v=8';
 import {PREVIEW_RATING,previewBuildingRating} from './map-style.mjs';
 import {elapsedLabel,scopedPeople,filterPeople,listCounts} from './people-view.mjs?v=2';
 import {OperationsDemo} from './operations-demo.mjs?v=5';
-import {mountVisibilityDemo} from './visibility-demo.mjs?v=18';
+import {mountVisibilityDemo} from './visibility-demo.mjs?v=19';
 const labels={sos:'SOS',unanswered:'応答なし',safe:'無事',rescued:'救助済み'};
 const stateText=p=>!hasPosition(p)&&p.s==='unanswered'?'安否未受信':labels[p.s];
 const query=new URLSearchParams(location.search),frames=[];
@@ -19,7 +19,7 @@ const config={zoom:query.get('view')==='wide'?14.2:16.8};
 
 function createFrame(config){
   const section=document.createElement('section');section.className='view';
-  section.hidden=!['response-town-display','response-list-fields','response-usual-places','response-safety-patterns','response-safe-display'].includes(config.id);
+  section.hidden=!['response-town-display','response-list-fields','response-usual-places','response-safety-patterns','response-safe-display','response-waiting-map'].includes(config.id);
   section.innerHTML=`<header class="comparison-caption"><h1 class="comparison-label">${escape(config.version)}</h1>${config.summary?`<p class="comparison-summary">${escape(config.summary)}</p>`:''}</header><article class="phone ${config.enhanced?'enhanced':''}" id="${config.id}-screen">
   <header class="top"><button class="plain menu" aria-label="メニュー">${icon('list')}</button>${config.enhanced?'<div class="incident-heading"><span class="title">地震発生</span><span class="incident-date">10月21日 14:32 ・ <span data-elapsed>28分前</span></span></div>':'<span class="title">地震発生</span><span class="date">10月21日</span>'}</header>
   <div class="tools"><label class="toggle-label">無事を表示<button class="switch" role="switch" aria-label="無事を表示" aria-checked="true"></button></label><button class="unknown">${icon('user')}位置不明 ${people.filter(p=>!hasPosition(p)).length}人${icon('caret-right')}</button></div>
@@ -33,16 +33,18 @@ function createFrame(config){
   document.querySelector('#board').append(section);
   return section.querySelector('.phone');
 }
-function refreshAll(){for(const frame of frames){frame.refreshSource?.();frame.index=buildIndex(Supercluster,frame.people,frame.showSafe,frame.clusterEndZoom);frame.revision++;frame.render();frame.refreshList?.();}}
+function refreshAll(){for(const frame of frames){frame.refreshSource?.();frame.index=buildIndex(Supercluster,frame.mapPeople,frame.showSafe,frame.clusterEndZoom);frame.revision++;frame.render();frame.refreshList?.();}}
 
 class MapFrame{
   get people(){return this.config.people||people;}
+  get mapPeople(){return this.config.mapPeople||this.people;}
   get homes(){return this.config.homes||homes;}
   get clusterEndZoom(){return this.config.clusterEndZoom??CLUSTER_END_ZOOM;}
   personById(id){return this.people.find(p=>p.id===id);}
+  mapPersonById(id){return this.config.mapPeople?this.mapPeople.find(p=>p.id===id):this.personById(id);}
   homeById(id){return this.homes.find(h=>h.id===id);}
   constructor(config,phone){
-    this.config=config;this.phone=phone;this.showSafe=true;this.index=buildIndex(Supercluster,this.people,true,this.clusterEndZoom);this.markers=new Map();this.revision=0;this.selected=null;
+    this.config=config;this.phone=phone;this.showSafe=true;this.index=buildIndex(Supercluster,this.mapPeople,true,this.clusterEndZoom);this.markers=new Map();this.revision=0;this.selected=null;
     this.sheet=phone.querySelector('.sheet');this.head=phone.querySelector('.sheet-head');this.body=phone.querySelector('.sheet-body');this.footer=phone.querySelector('.sheet-footer');
     this.map=new maplibregl.Map({container:config.id+'-map',style:'https://tiles.openfreemap.org/styles/positron',center:config.center||CENTER,zoom:config.zoom,maxZoom:21,pitch:0,bearing:0,dragRotate:false,attributionControl:false,locale:{'NavigationControl.ZoomIn':'拡大','NavigationControl.ZoomOut':'縮小'}});
     this.map.addControl(new maplibregl.AttributionControl({compact:false}),'bottom-right');
@@ -53,7 +55,7 @@ class MapFrame{
     this.map.on('zoom',()=>{if(Math.floor(this.map.getZoom())!==this.renderedZoom&&!this.pendingFrame){this.pendingFrame=requestAnimationFrame(()=>{this.pendingFrame=null;this.render();});}});
     this.map.on('moveend',()=>this.render());
     this.map.on('click',event=>this.selectBuilding(event));
-    phone.querySelector('.switch').onclick=event=>{this.showSafe=!this.showSafe;event.currentTarget.setAttribute('aria-checked',String(this.showSafe));this.index=buildIndex(Supercluster,this.people,this.showSafe,this.clusterEndZoom);this.revision++;this.render();};
+    phone.querySelector('.switch').onclick=event=>{this.showSafe=!this.showSafe;event.currentTarget.setAttribute('aria-checked',String(this.showSafe));this.index=buildIndex(Supercluster,this.mapPeople,this.showSafe,this.clusterEndZoom);this.revision++;this.render();};
     phone.querySelector('.legend-trigger').onclick=()=>this.showLegend();
     phone.querySelector('.unknown').onclick=()=>this.showUnknown();
     phone.querySelector('.menu').onclick=()=>this.showMenu();
@@ -76,11 +78,11 @@ class MapFrame{
     const b=this.map.getBounds(),z=this.map.getZoom();this.renderedZoom=Math.floor(z);
     const nodes=getNodes(this.index,[b.getWest(),b.getSouth(),b.getEast(),b.getNorth()],z),shown=new Set();let clusters=0,singles=0;
     for(const feature of nodes){
-      const props=feature.properties,isCluster=Boolean(props.cluster),p=isCluster?null:this.personById(props.personId),bubble=isCluster||(!this.config.wideAreaClusters&&z<this.clusterEndZoom);
+      const props=feature.properties,isCluster=Boolean(props.cluster),p=isCluster?null:this.mapPersonById(props.personId),bubble=isCluster||(!this.config.wideAreaClusters&&z<this.clusterEndZoom);
       const key=isCluster?`cluster-${props.cluster_id}`:`person-${props.personId}`;shown.add(key);
       const counts=displayCounts(feature),leaves=isCluster?this.index.getLeaves(props.cluster_id,Infinity):[feature];
       const members=leaves.map(f=>f.properties.personId).join(',');
-      const signature=`${bubble}-${counts.join(',')}-${members}-${p?.s}-${p?.impact}-${p?.enclosed}-${p?.acquiredAt}`;
+      const signature=`${bubble}-${counts.join(',')}-${members}-${p?.s}-${p?.impact}-${p?.enclosed}-${p?.acquiredAt}-${Boolean(p?.mapDisclosurePending)}`;
       if(isCluster)clusters++;else singles++;
       let entry=this.markers.get(key);
       if(entry?.signature!==signature){
@@ -396,3 +398,7 @@ if(query.get('demo')==='safety-patterns'||location.hash==='#response-safety-patt
 const safeDisplayFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true,wideAreaClusters:true,correctedTowns:true,restoredPersonDetails:true,earthquakeTitle:true,namedResidents:true,townDisplayFixes:true,restoredListFields:true,usualPlaces:true,allSafetyPatterns:true,hideSafeObservations:true});
 frames.push(safeDisplayFrame);
 if(query.get('demo')==='safe-display'||location.hash==='#response-safe-display-demo')requestAnimationFrame(()=>safeDisplayFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));
+
+const waitingMapFrame=mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom:config.zoom,refreshAll,overview:true,wideAreaClusters:true,correctedTowns:true,restoredPersonDetails:true,earthquakeTitle:true,namedResidents:true,townDisplayFixes:true,restoredListFields:true,usualPlaces:true,allSafetyPatterns:true,hideSafeObservations:true,anonymousWaitingMap:true});
+frames.push(waitingMapFrame);
+if(query.get('demo')==='waiting-map'||location.hash==='#response-waiting-map-demo')requestAnimationFrame(()=>waitingMapFrame.phone.parentElement.scrollIntoView({inline:'start',block:'start'}));

@@ -37,6 +37,13 @@ export function projectPerson(person,viewer,timing,{usualPlaces=false,hideSafeOb
   }
   return output;
 }
+export function projectMapPerson(person,viewer,timing,options={}){
+  const visible=projectPerson(person,viewer,timing,options);
+  if(visible)return visible;
+  const start=disclosureStart(timing);
+  if(!options.anonymousWaitingMap||!['resident','area'].includes(viewer.role)||person.regionId!==viewer.regionId||person.s!=='unanswered'||!hasPosition(person)||start===null||timing.now>=start+180000)return null;
+  return {id:person.id,s:'unanswered',name:'応答なしの人',location:[...person.location],acquiredAt:person.acquiredAt,impact:Boolean(person.impact),enclosed:Boolean(person.enclosed),mapDisclosurePending:true};
+}
 export function projectReport(row,viewer,people,timing){
   const person=row.personId?people.find(p=>p.id===row.personId):null;
   if(row.personId&&(!person||!canSeePerson(person,viewer,timing)))return null;

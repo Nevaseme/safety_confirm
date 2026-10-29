@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectReport,visibilityCsv,safetyStatistics,reportIcon,viewingScope,municipalMapBounds,TOWN_CENTERS} from './visibility-model.mjs';
+import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectMapPerson,projectReport,visibilityCsv,safetyStatistics,reportIcon,viewingScope,municipalMapBounds,TOWN_CENTERS} from './visibility-model.mjs';
 
 test('municipal scope covers every town independently of the last selected residential town',()=>{
   for(const regionId of ['east','central','west']){
@@ -100,6 +100,27 @@ test('1.6.15 hides both observations only while safe, regardless of position, wi
       person.s=state;
       assert.deepEqual(projectPerson(person,viewer,timing,{usualPlaces:true,hideSafeObservations:true}),projectPerson(person,viewer,timing,{usualPlaces:true}));
     }
+  }
+});
+test('waiting map exposes only anonymous location and detection flags, without widening list/detail disclosure',()=>{
+  const person={...sos,s:'unanswered',impact:true,enclosed:true,daytimePlace:'秘密の職場',history:[{text:'非公開の記録'}]};
+  const before={...timing,now:180999},options={usualPlaces:true,hideSafeObservations:true,anonymousWaitingMap:true};
+  for(const role of ['resident','area']){
+    const context={...viewer,role},map=projectMapPerson(person,context,before,options);
+    assert.deepEqual(map,{id:person.id,s:'unanswered',name:'応答なしの人',location:person.location,acquiredAt:person.acquiredAt,impact:true,enclosed:true,mapDisclosurePending:true});
+    assert.equal(projectPerson(person,context,before,options),null);
+    assert.deepEqual(projectMapPerson(person,context,timing,options),projectPerson(person,context,timing,options));
+  }
+  assert.equal(projectMapPerson(person,viewer,before),null);
+  for(const context of [{role:'resident',regionId:'west'},{role:'area',regionId:'west'},{role:'municipal',regionId:'east'}])assert.equal(projectMapPerson(person,context,before,options),null);
+  assert.equal(projectMapPerson({...person,location:null,acquiredAt:null},viewer,before,options),null);
+  assert.equal(projectMapPerson(person,viewer,{now:500000},options),null);
+});
+test('map projection keeps other safety states and safe observation suppression unchanged',()=>{
+  const options={usualPlaces:true,hideSafeObservations:true,anonymousWaitingMap:true};
+  for(const state of ['sos','safe','rescued']){
+    const person={...sos,s:state,impact:true,enclosed:true};
+    assert.deepEqual(projectMapPerson(person,viewer,timing,options),projectPerson(person,viewer,timing,options));
   }
 });
 test('non-SOS reports remain global and citizens see reporter address without identity',()=>{
