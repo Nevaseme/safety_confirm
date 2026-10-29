@@ -19,6 +19,7 @@ const config={zoom:query.get('view')==='wide'?14.2:16.8};
 
 function createFrame(config){
   const section=document.createElement('section');section.className='view';
+  section.hidden=!['response-town-display','response-list-fields'].includes(config.id);
   section.innerHTML=`<header class="comparison-caption"><h1 class="comparison-label">${escape(config.version)}</h1>${config.summary?`<p class="comparison-summary">${escape(config.summary)}</p>`:''}</header><article class="phone ${config.enhanced?'enhanced':''}" id="${config.id}-screen">
   <header class="top"><button class="plain menu" aria-label="メニュー">${icon('list')}</button>${config.enhanced?'<div class="incident-heading"><span class="title">地震発生</span><span class="incident-date">10月21日 14:32 ・ <span data-elapsed>28分前</span></span></div>':'<span class="title">地震発生</span><span class="date">10月21日</span>'}</header>
   <div class="tools"><label class="toggle-label">無事を表示<button class="switch" role="switch" aria-label="無事を表示" aria-checked="true"></button></label><button class="unknown">${icon('user')}位置不明 ${people.filter(p=>!hasPosition(p)).length}人${icon('caret-right')}</button></div>
