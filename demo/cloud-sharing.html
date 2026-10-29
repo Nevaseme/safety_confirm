@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer"><meta name="description" content="旧通信実験とAndroid 1.5.15のインターネット共有を、架空データで比較する操作デモ。">
+<title>Tasukeai — 共有機能の比較</title><link rel="icon" href="data:,">
+<link rel="stylesheet" href="design.css?v=11">
+<style>
+.sharing-page{font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif}.sharing-page [hidden]{display:none!important}
+.sharing-header{max-width:856px;margin:0 auto;padding:28px 16px 6px}.sharing-header a,.sharing-footer a{color:var(--blue);text-underline-offset:4px}.sharing-header h1{font-size:28px;letter-spacing:-.04em;margin:16px 0 8px}.sharing-header p{font-size:13px;line-height:1.8;color:#58677b;margin:0}.sharing-jump{display:flex;gap:18px;margin-top:14px;font-size:13px}
+.sharing-board{gap:28px;padding:22px 16px;justify-content:safe center;scroll-snap-type:x proximity}.sharing-view{flex:0 0 400px;scroll-snap-align:center}.sharing-view .comparison-caption{height:94px;padding:0 4px 14px}.sharing-view .comparison-label{font-size:16px}.sharing-view .comparison-summary{font-size:13px;line-height:1.7}
+.share-phone{height:auto!important;min-height:688px!important;border:1px solid #e0e6ee;border-radius:20px;overflow:hidden}.share-phone .top{height:64px}.share-phone .title{font-size:22px}.share-phone .back{font-size:30px;color:#697586;margin-right:4px}.share-content{padding:22px 22px 26px;flex:1}.share-content h2{font-size:21px;line-height:1.5;letter-spacing:-.025em;margin:0 0 22px}.share-content h3{font-size:17px;margin:0 0 7px}.share-content p{font-size:13px;line-height:1.8;margin:12px 0;color:#5b687b}.share-content label{display:block;font-size:13px;font-weight:650;margin:16px 0 6px}.share-content input{display:block;width:100%;min-width:0;height:49px;margin-top:7px;border:1px solid #bdc9d8;border-radius:10px;background:white;padding:10px 12px;color:var(--ink);font-size:15px}.share-content input[readonly]{background:#f5f7fa;color:#526277}.share-content input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}.share-content button{min-height:46px}.share-content .primary{margin-top:20px;background:var(--blue);border-radius:12px}.share-content .secondary{width:100%;margin-top:10px}.segments{display:flex;gap:9px;margin-top:18px}.segments button{border:1px solid #cad4e1;border-radius:22px;background:#fff;font-size:14px;padding:8px 17px}.segments button[aria-pressed=true]{border-color:var(--blue);color:var(--blue);background:#edf3ff}.share-note{padding:12px 14px;background:#f2f5f9;border-radius:10px;color:#4b5d75!important}.share-state{font-size:14px!important;padding:14px;border-radius:10px;background:#eaf7f2;color:#146447!important;min-height:52px}.share-state.waiting{background:#fff4df;color:#78540b!important}.role{display:inline-block;font-size:12px;padding:4px 9px;border-radius:6px;background:#edf2f8;color:#526580}.sample-code{margin-top:16px;padding:14px;border:1px solid #c9d8ec;border-radius:10px}.sample-code code{display:block;font-size:20px;letter-spacing:.07em;color:#17497e;overflow-wrap:anywhere}.share-content .text-button{border:0;background:none;color:var(--blue);padding:10px 0;text-align:left;font-size:14px}.share-bottom{border-top:1px solid var(--line);padding:13px 22px;font-size:12px;color:#6b7789;background:#fafbfd}.demo-controls{margin-top:16px;padding:15px 16px;background:#e5eaf1;border-radius:12px;font-size:13px}.demo-controls p{margin:0 0 9px;font-weight:650}.demo-controls label{display:flex;gap:9px;align-items:center;margin:9px 0;min-height:30px}.demo-controls input{width:18px;height:18px;accent-color:var(--blue)}.demo-controls button{background:none;border:0;color:#315b8b;padding:8px 0;font:inherit;text-decoration:underline;text-underline-offset:3px}.sharing-footer{max-width:856px;margin:0 auto;padding:8px 16px 32px;font-size:12px;line-height:1.8;color:#647186}.old-steps{list-style:none;counter-reset:step;padding:0;margin:18px 0}.old-steps li{counter-increment:step;display:flex;gap:10px;margin:13px 0;font-size:14px;line-height:1.6}.old-steps li:before{content:counter(step);width:23px;height:23px;border-radius:50%;background:#e8edf5;color:#5e718c;flex-shrink:0;text-align:center;font-size:12px;line-height:23px}.old-roles{display:flex;gap:7px;margin-top:20px}.old-roles span{padding:7px 12px;background:#f0f3f8;border-radius:7px;font-size:13px}.old-roles b{color:#7e8a9c;align-self:center;font-weight:400}
+@media(max-width:460px){.sharing-page{background:#edf0f5}.sharing-header{padding:21px 18px 5px}.sharing-header h1{font-size:25px}.sharing-board{padding:18px 14px;gap:18px;justify-content:flex-start}.sharing-view{flex-basis:calc(100vw - 28px)}.share-phone{min-height:670px!important}.share-content{padding:20px}.sharing-view .comparison-caption{height:104px}.sharing-footer{padding-inline:18px}}
+</style>
+</head>
+<body class="sharing-page">
+<header class="sharing-header">
+ <a href="index.html">← これまでの画面比較へ</a>
+ <h1>グループで記録を共有する</h1>
+ <p>実装済み機能を確認する操作デモです。人物・グループ・招待コードはすべて架空で、入力は保存・送信されません。</p>
+ <nav class="sharing-jump" aria-label="比較する画面"><a href="#old-version">従来の接続</a><a href="#new-version">1.5.15 の共有操作 →</a></nav>
+</header>
+<main class="board sharing-board">
+ <section class="sharing-view" id="old-version" aria-labelledby="old-label">
+  <div class="comparison-caption"><p class="comparison-label" id="old-label">従来版 · PCを使う通信実験</p><p class="comparison-summary">同じネットワークで中継先を入力。A・B・Cの端末間で記録を受け渡します。</p></div>
+  <article class="phone share-phone">
+   <header class="top"><span class="back" aria-hidden="true">‹</span><span class="title">設定</span></header>
+   <div class="share-content">
+    <h2>通信実験</h2>
+    <label>接続先<input value="wss://example.invalid/socket" readonly aria-label="従来版の接続先（架空）"></label>
+    <label>接続コード<input value="DEMO-LOCAL" readonly aria-label="従来版の接続コード（架空）"></label>
+    <div class="old-roles" aria-label="実験用の端末区分"><span>Android A</span><b>↔</b><span>PWA B</span><b>↔</b><span>PWA C</span></div>
+    <ol class="old-steps"><li>PCで中継サーバーを起動する</li><li>端末を同じネットワークへ接続する</li><li>接続先とコードを端末ごとに入力する</li></ol>
+    <p class="share-note">この実験サーバーは記録を保存しません。記録は各端末に残ります。</p>
+   </div>
+   <footer class="share-bottom">従来の実装を説明する表示 · 接続操作なし</footer>
+  </article>
+ </section>
+ <section class="sharing-view" id="new-version" aria-labelledby="new-label">
+  <div class="comparison-caption"><p class="comparison-label" id="new-label">Android 1.5.15 · インターネットで共有</p><p class="comparison-summary">管理者が作成し、招待コードで参加。PCを起動せず、保存した記録をほかの端末へ届けます。</p></div>
+  <article class="phone share-phone">
+   <header class="top"><span class="back" aria-hidden="true">‹</span><span class="title">設定</span></header>
+   <div class="share-content">
+    <h2>インターネットで共有</h2>
+    <form id="registration">
+     <label>活動名<input id="activity-name" value="山田 さくら（架空）" maxlength="40" required autocomplete="off"></label>
+     <div class="segments" role="group" aria-label="参加方法"><button type="button" id="choose-join" aria-pressed="true">招待で参加</button><button type="button" id="choose-create" aria-pressed="false">グループを作る</button></div>
+     <label id="invite-field">招待コード<input id="invitation" value="DEMO-AOBA" maxlength="40" autocomplete="off" spellcheck="false"></label>
+     <label id="group-field" hidden>グループ名<input id="group-name" value="あおば町内会（架空）" maxlength="40" autocomplete="off"></label>
+     <button class="primary" id="register" type="submit">グループに参加</button>
+     <p>自分の登録情報を参加先に引き継ぎます。元のグループの記録も端末に残ります。</p>
+    </form>
+    <div id="connected" hidden>
+     <h3 id="connected-name">あおば町内会（架空）</h3><span class="role" id="role">参加者</span>
+     <button class="primary" id="sync" type="button">今すぐ同期</button>
+     <button class="secondary" id="invite" type="button" hidden>招待コードを作る</button>
+     <div class="sample-code" id="invitation-result" hidden><code>DEMO-AOBA</code><p>模擬コード · 実際のグループには参加できません。実装版のコードは24時間有効です。</p><button class="secondary" type="button" id="copy-code">模擬コードをコピー</button></div>
+     <p id="foreign-note" class="share-note" hidden>近くの端末から受け取った1件は、この端末に保存済みです。記録した本人の端末が接続するとインターネットで共有されます。</p>
+     <button class="text-button" type="button" id="change-group">別のグループに接続</button>
+    </div>
+    <p id="status" class="share-state" role="status" aria-live="polite">模擬操作：招待で参加するか、グループを作成できます。</p>
+   </div>
+   <footer class="share-bottom">実装版に対応した操作デモ · 通信と保存は模擬</footer>
+  </article>
+  <aside class="demo-controls" aria-label="動作確認用の模擬条件"><p>表示する状況を試す</p><label><input type="checkbox" id="offline">圏外にする（模擬）</label><label><input type="checkbox" id="foreign">近くから受け取った記録を表示</label><button type="button" id="reset">最初の状態に戻す</button></aside>
+ </section>
+</main>
+<footer class="sharing-footer">Android 1.5.15 の共有画面とPWAの作成・招待・同期機能をもとにした比較です。実機のスクリーンショットではありません。<br>既存の <a href="index.html">Web 1.6.17 までの画面比較</a>も引き続き確認できます。</footer>
+<script>
+(() => {
+ const $=id=>document.getElementById(id);let mode='join',connected=false,admin=false,timer=null;
+ const status=(text,waiting=false)=>{$('status').textContent=text;$('status').classList.toggle('waiting',waiting);};
+ function select(next){mode=next;$('choose-join').setAttribute('aria-pressed',String(mode==='join'));$('choose-create').setAttribute('aria-pressed',String(mode==='create'));$('invite-field').hidden=mode==='create';$('group-field').hidden=mode==='join';$('invitation').required=mode==='join';$('group-name').required=mode==='create';$('register').textContent=mode==='create'?'グループを作成':'グループに参加';}
+ function render(){ $('registration').hidden=connected;$('connected').hidden=!connected;$('role').textContent=admin?'管理者':'参加者';$('invite').hidden=!admin;$('foreign-note').hidden=!connected||!$('foreign').checked; }
+ function sync(){clearTimeout(timer);if(!connected)return;if($('offline').checked){$('sync').disabled=false;status('模擬：端末に保存済み・送信待ち 1件。通信が戻ると再送します。',true);return;}$('sync').disabled=true;status('模擬：保存した記録を共有しています…');timer=setTimeout(()=>{$('sync').disabled=false;status('模擬：共有サーバーへの保存を確認しました。送信 3件・取得 2件。');},350);}
+ $('choose-join').onclick=()=>select('join');$('choose-create').onclick=()=>select('create');
+ $('registration').onsubmit=event=>{event.preventDefault();if($('offline').checked){status('模擬：圏外のため参加できません。通信が戻ってから同じ入力で再試行できます。',true);return;}if(mode==='join'&&$('invitation').value.trim()!=='DEMO-AOBA'){status('このデモでは「DEMO-AOBA」を入力してください。',true);return;}connected=true;admin=mode==='create';$('connected-name').textContent=admin?$('group-name').value.trim():'あおば町内会（架空）';render();status('模擬：参加できました。端末の記録を共有できます。');};
+ $('sync').onclick=sync;
+ $('invite').onclick=()=>{$('invitation-result').hidden=false;status('模擬の招待コードを表示しました。');};
+ $('copy-code').onclick=async()=>{try{await navigator.clipboard.writeText('DEMO-AOBA');status('模擬コードをコピーしました。');}catch{status('模擬コードは DEMO-AOBA です。選択してコピーできます。');}};
+ $('offline').onchange=()=>{if(connected)sync();else status($('offline').checked?'模擬：圏外です。作成・参加には通信が必要です。':'模擬：通信が戻りました。作成・参加を試せます。',$('offline').checked);};
+ $('foreign').onchange=render;
+ $('change-group').onclick=()=>{clearTimeout(timer);connected=false;$('invitation-result').hidden=true;$('sync').disabled=false;render();status('模擬：参加先を選べます。元の記録を残す動作を確認します。');};
+ $('reset').onclick=()=>{clearTimeout(timer);connected=false;admin=false;$('offline').checked=false;$('foreign').checked=false;$('invitation').value='DEMO-AOBA';$('group-name').value='あおば町内会（架空）';$('activity-name').value='山田 さくら（架空）';$('invitation-result').hidden=true;$('sync').disabled=false;select('join');render();status('模擬操作：招待で参加するか、グループを作成できます。');};
+ select('join');render();
+})();
+</script>
+</body></html>
