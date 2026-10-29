@@ -3,7 +3,7 @@ import {createTownFixtures} from './town-fixtures.mjs?v=3';
 import {OperationsDemo} from './operations-demo.mjs?v=5';
 import {REGIONS,regionName,filterCases,summarizeCases} from './operations-model.mjs?v=4';
 import {STATES,NOW,hasPosition,buildIndex} from './clustering.mjs?v=7';
-import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectReport,visibilityCsv,statisticsCsv,safetyStatistics,reportIcon,viewingScope,municipalMapBounds,TOWN_CENTERS} from './visibility-model.mjs?v=3';
+import {disclosureStart,recordTrigger,canSeePerson,projectPerson,projectReport,visibilityCsv,statisticsCsv,safetyStatistics,reportIcon,viewingScope,municipalMapBounds,TOWN_CENTERS} from './visibility-model.mjs?v=4';
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icon=name=>`<i class="ph-fill ph-${name}" aria-hidden="true"></i>`;
@@ -100,7 +100,7 @@ class VisibilityController{
   timing(){return {...this.clock,now:NOW+this.elapsed*1000+Date.now()-this.startedAt};}
   ready(){const t=this.timing(),start=disclosureStart(t);return start!==null&&t.now>=start+180000;}
   allowed(id){const p=this.rawPeople.find(p=>p.id===id);return p&&canSeePerson(p,this.viewer,this.timing());}
-  projectPeople(){return this.rawPeople.map(p=>projectPerson(p,this.viewer,this.timing())).filter(Boolean);}
+  projectPeople(){return this.rawPeople.map(p=>projectPerson(p,this.viewer,this.timing(),{usualPlaces:this.frame.config.usualPlaces})).filter(Boolean);}
   refreshPeople(){this.frame.config.people=this.projectPeople();this.frame.index=buildIndex(Supercluster,this.frame.people,this.frame.showSafe,this.frame.clusterEndZoom);this.frame.revision++;this.frame.render();this.frame.refreshList?.();}
   updateToolbar(){const sec=Math.max(0,Math.floor((this.timing().now-(disclosureStart(this.clock)??NOW))/1000));this.toolbar.querySelector('button').textContent=`${roles[this.viewer.role]}・${viewingScope(this.viewer).label}`;this.toolbar.querySelector('[data-demo-clock]').textContent=`経過 ${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;}
   apply(){
@@ -143,7 +143,7 @@ class VisibilityController{
   }
 }
 
-export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false,namedResidents=false,townDisplayFixes=false,restoredListFields=false}){
+export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,refreshAll,overview=false,wideAreaClusters=false,correctedTowns=false,restoredPersonDetails=false,earthquakeTitle=false,namedResidents=false,townDisplayFixes=false,restoredListFields=false,usualPlaces=false}){
   class VisibilityFrame extends ListMapFrame{
     showMap(){const entering=this.page!=='map';super.showMap();if(entering&&this.visibility?.viewer.role==='municipal')this.visibility.showCityMap();}
     personById(id){return id==='p5'&&this.visibility?this.visibility.rawPeople.find(p=>p.id===id):super.personById(id);}
@@ -166,7 +166,7 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
     openVisiblePerson(person){
       const p=this.people.find(row=>row.id===person.id);if(!p){this.visibility.denied();return;}
       const known=hasPosition(p);
-      if(this.config.restoredPersonDetails){this.showPersonDetail(p,{showResidence:!known,actionPerson:this.visibility.rawPeople.find(row=>row.id===p.id)});return;}
+      if(this.config.restoredPersonDetails){this.showPersonDetail(p,{showResidence:!known||(this.config.usualPlaces&&p.s==='unanswered'),showDaytimePlace:this.config.usualPlaces,actionPerson:this.visibility.rawPeople.find(row=>row.id===p.id)});return;}
       this.openSheet(`<h2>${esc(personLabel(p))}</h2><p class="ops-type-label">${labels[p.s]}・${esc(regionName(p.regionId))}</p>`,`<p>${known?'最後のスマホ位置を地図に表示しています。':'位置不明'}</p>${p.s==='sos'&&p.memo?`<h3>SOSメモ</h3><p>${esc(p.memo)}</p>`:''}${!known?`<h3>登録住居・寝室</h3><p>${esc(p.address||'住所未登録')}</p><p>${esc(p.bedroom||'寝室未登録')}</p><button class="ops-text-button" data-home>建物を見る</button>`:''}<details class="ops-history"><summary>救助・確認の記録 ${p.history?.length||0}件</summary>${this.historyHTML(p)}</details>`,['sos','unanswered'].includes(p.s)?'<button class="primary blue" data-rescue>救助済みにする</button>':p.s==='rescued'?'<button class="secondary full" data-correct>救助記録を訂正する</button>':'');
       this.footer.querySelector('[data-rescue]')?.addEventListener('click',()=>this.rescueForm(this.visibility.rawPeople.find(r=>r.id===p.id)));
       this.footer.querySelector('[data-correct]')?.addEventListener('click',()=>this.correctForm(this.visibility.rawPeople.find(r=>r.id===p.id)));
@@ -193,6 +193,10 @@ export function mountVisibilityDemo({ListMapFrame,createFrame,people,homes,zoom,
   if(namedResidents)Object.assign(config,{id:'response-names',version:'ver 1.6.10',summary:'住民に自然な氏名を設定'});
   if(townDisplayFixes)Object.assign(config,{id:'response-town-display',version:'ver 1.6.11',summary:'自町内会の吹き出しを非表示、建築年と応答なしの観測例を追加',townDisplayFixes:true});
   if(restoredListFields)Object.assign(config,{id:'response-list-fields',version:'ver 1.6.12',summary:'人物一覧に位置更新の経過時間と寝室情報を復元',restoredListFields:true});
+  if(usualPlaces){
+    for(const person of people)if(person.s==='unanswered')person.daytimePlace=hasPosition(person)?'木山工房（架空町150-2）・1階の作業場':'木山事務所（架空町160-3）・2階の事務室';
+    Object.assign(config,{id:'response-usual-places',version:'ver 1.6.13',summary:'応答なしは位置の有無によらず住所・昼間いる場所を表示',usualPlaces:true});
+  }
   const frame=new VisibilityFrame(config,createFrame(config)),visibility=new VisibilityController(frame,people,config.homes);
   new VisibilityOperations(frame,visibility,refreshAll);visibility.apply();if(overview)installMapOverview(frame);return frame;
 }

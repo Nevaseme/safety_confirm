@@ -61,6 +61,34 @@ test('known SOS projection contains neither residence address, home link nor bed
   const permitted=projectPerson(unknown,viewer,timing);
   assert.equal(permitted.address,'架空町123-1');assert.equal(permitted.bedroom,'寝室');
 });
+test('1.6.13 discloses unanswered usual places with or without a phone position and preserves older versions',()=>{
+  for(const source of [unknown,{...sos,s:'unanswered'}]){
+    const person={...source,daytimePlace:'工房・架空町150-2・1階'};
+    for(const role of ['resident','area']){
+      const projected=projectPerson(person,{...viewer,role},timing,{usualPlaces:true});
+      for(const key of ['address','homeId','bedroom','daytimePlace'])assert.equal(projected[key],person[key]);
+    }
+    const previous=projectPerson(person,viewer,timing);
+    assert.ok(!('daytimePlace' in previous));
+    if(person.location)assert.ok(!('address' in previous));
+  }
+});
+test('usual places remain behind the three-minute and town/role gates',()=>{
+  for(const source of [unknown,{...sos,s:'unanswered'}]){
+    const person={...source,daytimePlace:'工房・架空町150-2・1階'};
+    assert.equal(projectPerson(person,viewer,{...timing,now:180999},{usualPlaces:true}),null);
+    assert.equal(projectPerson(person,viewer,{now:500000},{usualPlaces:true}),null);
+    for(const context of [{role:'resident',regionId:'west'},{role:'area',regionId:'west'},{role:'municipal',regionId:'east'}])assert.equal(projectPerson(person,context,timing,{usualPlaces:true}),null);
+  }
+});
+test('usual places do not expand known SOS, safe or rescued disclosure and remain optional',()=>{
+  for(const s of ['sos','safe','rescued']){
+    const projected=projectPerson({...sos,s,daytimePlace:'工房'},viewer,timing,{usualPlaces:true});
+    for(const key of ['address','homeId','bedroom','daytimePlace'])assert.ok(!(key in projected));
+  }
+  const without=projectPerson(unknown,viewer,timing,{usualPlaces:true});
+  assert.equal(without.address,unknown.address);assert.ok(!('daytimePlace' in without));
+});
 test('non-SOS reports remain global and citizens see reporter address without identity',()=>{
   const projected=projectReport(report,viewer,[],timing);
   assert.equal(projected.description,'倒木');assert.deepEqual(projected.reporter,{address:'架空町456-2'});
