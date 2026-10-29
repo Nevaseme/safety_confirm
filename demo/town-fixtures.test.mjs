@@ -2,9 +2,44 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTownFixtures} from './town-fixtures.mjs';
 import {people,homes} from './data.mjs';
+import {hasPosition,STATES} from './clustering.mjs';
 import {safetyStatistics,projectPerson,municipalMapBounds} from './visibility-model.mjs';
 
 const inside=([lng,lat],[[w,s],[e,n]])=>lng>=w&&lng<=e&&lat>=s&&lat<=n;
+test('all-pattern fixtures cover eight safety/position pairs with both observations in every town',()=>{
+  const baseline=createTownFixtures(people,homes,{observations:true,namedResidents:true});
+  const fixture=createTownFixtures(people,homes,{observations:true,namedResidents:true,allSafetyPatterns:true});
+  assert.equal(fixture.people.length,45);assert.equal(new Set(fixture.people.map(p=>p.id)).size,45);
+  assert.deepEqual(fixture.homes,baseline.homes);assert.deepEqual(fixture.bounds,baseline.bounds);assert.deepEqual(fixture.reports,baseline.reports);
+  for(const old of baseline.people){
+    const current=fixture.people.find(p=>p.id===old.id);
+    for(const key of ['name','s','homeId','regionId','location','acquiredAt','bedroom','memo'])assert.deepEqual(current[key],old[key]);
+  }
+  for(const regionId of ['east','central','west']){
+    const members=fixture.people.filter(p=>p.regionId===regionId);
+    assert.equal(members.length,15);
+    assert.deepEqual(safetyStatistics(members).find(t=>t.regionId===regionId).counts,{sos:2,unanswered:2,safe:9,rescued:2});
+    for(const state of STATES)for(const known of [true,false]){
+      const target=members.find(p=>p.s===state&&hasPosition(p)===known&&p.impact&&p.enclosed);
+      assert.ok(target,`${regionId}/${state}/${known}`);
+      assert.equal(target.impactAt,'14:32');assert.equal(target.enclosedAt,'14:33');
+      if(!known){assert.equal(target.location,null);assert.equal(target.acquiredAt,null);}
+      if(state==='safe'){assert.ok(target.answeredAt>target.enclosedAt);assert.ok(target.history[0].time>target.enclosedAt);}
+      if(state==='rescued'){assert.equal(target.priorSafety,'sos');assert.ok(target.history[0].time>target.enclosedAt);}
+    }
+  }
+  assert.deepEqual(createTownFixtures(people,homes,{observations:true,namedResidents:true}),baseline);
+});
+test('all-pattern data preserves unanswered waiting and regional disclosure including sensor records',()=>{
+  const fixture=createTownFixtures(people,homes,{observations:true,namedResidents:true,allSafetyPatterns:true});
+  for(const person of fixture.people.filter(p=>p.regionId==='east')){
+    const timing={eewReceivedAt:0,now:180000};
+    const projected=projectPerson(person,{role:'resident',regionId:'east'},timing,{usualPlaces:true});
+    assert.ok(projected);assert.equal(projected.impact,person.impact);assert.equal(projected.enclosed,person.enclosed);
+    if(person.s==='unanswered')assert.equal(projectPerson(person,{role:'resident',regionId:'east'},{...timing,now:179999},{usualPlaces:true}),null);
+    for(const viewer of [{role:'resident',regionId:'west'},{role:'municipal',regionId:'east'}])assert.equal(projectPerson(person,viewer,timing,{usualPlaces:true}),null);
+  }
+});
 test('detail examples restore observations without changing town membership, locations or privacy',()=>{
   const baseline=createTownFixtures(people,homes),fixture=createTownFixtures(people,homes,{observations:true});
   assert.deepEqual(fixture.homes,baseline.homes);assert.deepEqual(fixture.bounds,baseline.bounds);assert.deepEqual(fixture.reports,baseline.reports);
