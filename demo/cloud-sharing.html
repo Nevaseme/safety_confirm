@@ -20,7 +20,7 @@
  <a href="index.html">← これまでの画面比較へ</a>
  <h1>グループで記録を共有する</h1>
  <p>左の2画面は操作デモ、右側はPWA・Androidの実画面です。人物・グループ・招待コードはすべて架空で、この比較ページの入力は保存・送信されません。</p>
- <nav class="sharing-jump" aria-label="比較する画面"><a href="#old-version">従来の接続</a><a href="#new-version">1.5.15 の共有操作</a><a href="#pwa-version">PWA 1.5.0 の実画面</a><a href="#tsunami-version">以前の津波地図</a><a href="#pwa-1617-version">PWA 1.6.0</a><a href="#android-1518-version">Android 1.5.18</a><a href="#pwa-161-version">PWA 1.6.1</a><a href="#android-1519-version">Android 1.5.19 →</a></nav>
+ <nav class="sharing-jump" aria-label="比較する画面"><a href="#old-version">従来の接続</a><a href="#new-version">1.5.15 の共有操作</a><a href="#pwa-version">PWA 1.5.0 の実画面</a><a href="#tsunami-version">以前の津波地図</a><a href="#pwa-1617-version">PWA 1.6.0</a><a href="#android-1518-version">Android 1.5.18</a><a href="#pwa-161-version">PWA 1.6.1</a><a href="#android-1519-version">Android 1.5.19 →</a><a href="#android-1520-version">Android 1.5.20 →</a></nav>
 </header>
 <main class="board sharing-board">
  <section class="sharing-view" id="old-version" aria-labelledby="old-label">
@@ -110,6 +110,13 @@
   <p class="pwa-screenshot-note">Android 1.5.19（コード32）をエミュレーターで操作し、通報・担当・対応状況・資材の保存を確認した実画面です。人物・グループ・通報は架空で、画像内のボタンは操作できません。</p>
   <p class="pwa-screenshot-note">「対応」は英語表示を選んだ画面です。氏名や通報本文など、利用者が入力した文章はそのまま表示しています。「安否」は回答前の入力画面です。</p>
  </section>
+ <section class="sharing-view" id="android-1520-version" aria-labelledby="android-1520-label">
+  <div class="comparison-caption"><p class="comparison-label" id="android-1520-label">Android 1.5.20 · 実装画面</p><p class="comparison-summary">1.6.17に合わせ、白い下部メニュー・青い選択ボタン・入力欄・文字とアイコンを修正。実機でも共通部品の表示を確認しました。</p></div>
+  <div class="screenshot-tabs" role="group" aria-label="Android 1.5.20の実画面を選ぶ"><button type="button" data-android1520-screen="people" aria-pressed="true">一覧</button><button type="button" data-android1520-screen="menu" aria-pressed="false">メニュー</button><button type="button" data-android1520-screen="settings" aria-pressed="false">設定</button><button type="button" data-android1520-screen="safety" aria-pressed="false">安否</button><button type="button" data-android1520-screen="map" aria-pressed="false">地図</button></div>
+  <figure class="pwa-screen"><img id="android-1520-screenshot" src="assets/android-1.5.20/people.png" width="1080" height="2400" alt="Android 1.5.20の一覧。架空データを使ったエミュレーター画像。"><figcaption id="android-1520-caption" aria-live="polite">一覧 · 製品と同じ画面部品による非保存の確認画面</figcaption></figure>
+  <p class="pwa-screenshot-note">架空データでエミュレーター撮影。実機や接続中のグループの画像は公開していません。画像内は操作できず、下の選択ボタンで画面を比較できます。</p>
+  <p class="pwa-screenshot-note">Android固有の機能への入口は保持。統計は取得できるグループの範囲だけ表示し、Webの架空の他町内会の数値を製品へ転用していません。</p>
+ </section>
 </main>
 <footer class="sharing-footer">左の2画面は機能を説明するデモ、右のPWA・Android画面は実装版のスクリーンショットです。<br>既存の <a href="index.html">Web 1.6.17 までの画面比較</a>も引き続き確認できます。</footer>
 <script>
@@ -133,6 +140,8 @@
  for(const button of document.querySelectorAll('[data-restored-screen]'))button.onclick=()=>{const key=button.dataset.restoredScreen;for(const other of document.querySelectorAll('[data-restored-screen]'))other.setAttribute('aria-pressed',String(other===button));$('restored-screenshot').src=`assets/pwa-1.6.0/${key}.png`;$('restored-screenshot').alt=`PWA 1.6.0 の${restoredScreens[key]}。架空データのローカル確認画像。`;$('restored-caption').textContent=`${restoredScreens[key]} · ローカル実装の確認画像`;};
  const currentScreens={people:'メンバー一覧',response:'対応する案件',material:'通報の詳細と必要資材',safety:'自分の安否とメモ'};
  for(const button of document.querySelectorAll('[data-current-screen]'))button.onclick=()=>{const key=button.dataset.currentScreen;for(const other of document.querySelectorAll('[data-current-screen]'))other.setAttribute('aria-pressed',String(other===button));$('current-screenshot').src=`assets/pwa-1.6.1/${key}.png`;$('current-screenshot').alt=`PWA 1.6.1の${currentScreens[key]}。架空の訓練データを使った実装画面。`;$('current-caption').textContent=`${currentScreens[key]} · 公開版と同じ実装の確認画像（ローカル撮影）`;};
+ const android1520Screens={people:'一覧',menu:'メニュー',settings:'設定',safety:'安否',map:'地図'};
+ for(const button of document.querySelectorAll('[data-android1520-screen]'))button.onclick=()=>{const key=button.dataset.android1520Screen;for(const other of document.querySelectorAll('[data-android1520-screen]'))other.setAttribute('aria-pressed',String(other===button));$('android-1520-screenshot').src=`assets/android-1.5.20/${key}.png`;$('android-1520-screenshot').alt=`Android 1.5.20の${android1520Screens[key]}。架空データの確認画面。`;$('android-1520-caption').textContent=`${android1520Screens[key]} · 製品と同じ画面部品による非保存の確認画面`;};
  const android1519Screens={people:'メンバー一覧',response:'対応一覧（英語表示）',material:'対応状況と必要資材',safety:'安否の入力'};
  for(const button of document.querySelectorAll('[data-android1519-screen]'))button.onclick=()=>{const key=button.dataset.android1519Screen;for(const other of document.querySelectorAll('[data-android1519-screen]'))other.setAttribute('aria-pressed',String(other===button));$('android-1519-screenshot').src=`assets/android-1.5.19/${key}.png`;$('android-1519-screenshot').alt=`Android 1.5.19の${android1519Screens[key]}。架空の訓練データを使ったエミュレーター実装画面。`;$('android-1519-caption').textContent=`${android1519Screens[key]} · Androidエミュレーターで確認した画像`;};
  const screens={create:'グループ作成',join:'招待コードで参加',safety:'自分の安否',list:'メンバー一覧'};
