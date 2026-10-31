@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="referrer" content="no-referrer"><meta name="description" content="旧画面を残し、PWA 1.6.1とAndroid 1.5.19の一覧・対応・資材・安否を実装画面で比較。">
+<meta name="referrer" content="no-referrer"><meta name="description" content="旧画面を残し、会場参加から安否・地図までをPWA 1.6.2とAndroid 1.5.24の実装画面で比較。">
 <title>Tasukeai — 共有機能の比較</title><link rel="icon" href="data:,">
 <link rel="stylesheet" href="design.css?v=11">
 <style>
@@ -117,6 +117,17 @@
   <p class="pwa-screenshot-note">架空データでエミュレーター撮影。実機や接続中のグループの画像は公開していません。画像内は操作できず、下の選択ボタンで画面を比較できます。</p>
   <p class="pwa-screenshot-note">Android固有の機能への入口は保持。統計は取得できるグループの範囲だけ表示し、Webの架空の他町内会の数値を製品へ転用していません。</p>
  </section>
+ <section class="sharing-view" id="venue-pwa" aria-labelledby="venue-pwa-label">
+  <div class="comparison-caption"><p class="comparison-label" id="venue-pwa-label">PWA 1.6.2 · 会場参加の実装画面</p><p class="comparison-summary">グループ名とパスワードで参加し、名前→安否→地図へ。会場専用の京都の配置は、実際の住居・GPSと分けて保存します。</p></div>
+  <div class="segments" aria-label="PWA会場画面"><button data-venue-pwa="01-name" aria-pressed="true">名前</button><button data-venue-pwa="02-safety" aria-pressed="false">安否</button><button data-venue-pwa="03-map" aria-pressed="false">地図</button></div>
+  <figure><img id="venue-pwa-image" src="assets/venue-pwa-1.6.2/01-name.png" alt="PWA 1.6.2の会場参加画面。架空データの公開版操作試験。" style="width:100%;height:auto;border-radius:18px"><figcaption>公開PWAを専用ブラウザーで確認した実装画面</figcaption></figure>
+  <p><a href="https://tasukeai-sync.tomodachi-takumi.workers.dev/">公開PWAを開く</a></p>
+ </section>
+ <section class="sharing-view" id="venue-android" aria-labelledby="venue-android-label">
+  <div class="comparison-caption"><p class="comparison-label" id="venue-android-label">Android 1.5.24 · 会場参加の実装画面</p><p class="comparison-summary">会場名・パスワードから参加し、住居入力なしで安否回答。御所南〜烏丸御池のデモ位置を使い、地図／一覧／対応／安否の配置を維持します。</p></div>
+  <div class="segments" aria-label="Android会場画面"><button data-venue-android="01-credentials" aria-pressed="true">参加</button><button data-venue-android="02-name" aria-pressed="false">名前</button><button data-venue-android="03-safety" aria-pressed="false">安否</button><button data-venue-android="04-map" aria-pressed="false">地図</button></div>
+  <figure><img id="venue-android-image" src="assets/venue-android-1.5.24/01-credentials.png" alt="Android 1.5.24の会場参加画面。架空データによるエミュレーター試験。" style="width:100%;height:auto;border-radius:18px"><figcaption>公開サーバーに接続したAndroidエミュレーターの実装画面</figcaption></figure>
+ </section>
 </main>
 <footer class="sharing-footer">左の2画面は機能を説明するデモ、右のPWA・Android画面は実装版のスクリーンショットです。<br>既存の <a href="index.html">Web 1.6.17 までの画面比較</a>も引き続き確認できます。</footer>
 <script>
@@ -148,6 +159,8 @@
  for(const button of document.querySelectorAll('[data-screen]'))button.onclick=()=>{const key=button.dataset.screen;for(const other of document.querySelectorAll('[data-screen]'))other.setAttribute('aria-pressed',String(other===button));$('pwa-screenshot').src=`assets/pwa-1.5.0/${key}.png`;$('pwa-screenshot').alt=`PWA 1.5.0の実装画面：${screens[key]}。架空データによる確認画面。`;$('pwa-screenshot-caption').textContent=`${screens[key]} · 実装版をブラウザーで確認した画像`;};
  const tsunamiScreens={online:{file:'online',caption:'PWA 1.5.2 · 通信ありで読み込んだ計算結果'},offline:{file:'offline',caption:'PWA 1.5.2 · 圏外で保存済み計算を再表示'},android:{file:'android-1.5.17',caption:'Android 1.5.17 · エミュレーターでの実装画面（実機は未更新）'}};
  for(const button of document.querySelectorAll('[data-tsunami-screen]'))button.onclick=()=>{const screen=tsunamiScreens[button.dataset.tsunamiScreen];for(const other of document.querySelectorAll('[data-tsunami-screen]'))other.setAttribute('aria-pressed',String(other===button));$('tsunami-screenshot').src=`assets/pwa-tsunami/${screen.file}.png`;$('tsunami-screenshot').alt=`${screen.caption}。熱海津波計算地図、海岸の基準地点3m、10m格子。`;$('tsunami-screenshot-caption').textContent=screen.caption;};
+ for(const button of document.querySelectorAll('[data-venue-pwa]'))button.onclick=()=>{for(const other of document.querySelectorAll('[data-venue-pwa]'))other.setAttribute('aria-pressed',String(other===button));$('venue-pwa-image').src=`assets/venue-pwa-1.6.2/${button.dataset.venuePwa}.png`;};
+ for(const button of document.querySelectorAll('[data-venue-android]'))button.onclick=()=>{for(const other of document.querySelectorAll('[data-venue-android]'))other.setAttribute('aria-pressed',String(other===button));$('venue-android-image').src=`assets/venue-android-1.5.24/${button.dataset.venueAndroid}.png`;};
 })();
 </script>
 </body></html>
