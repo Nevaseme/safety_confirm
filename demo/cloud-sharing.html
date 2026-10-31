@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="referrer" content="no-referrer"><meta name="description" content="旧画面を残し、会場参加から安否・地図までをPWA 1.6.2とAndroid 1.5.24の実装画面で比較。">
+<meta name="referrer" content="no-referrer"><meta name="description" content="旧画面を残し、会場参加から安否・地図までをPWA 1.6.3とAndroid 1.5.25の実装画面で比較。">
 <title>Tasukeai — 共有機能の比較</title><link rel="icon" href="data:,">
 <link rel="stylesheet" href="design.css?v=11">
 <style>
@@ -20,7 +20,7 @@
  <a href="index.html">← これまでの画面比較へ</a>
  <h1>グループで記録を共有する</h1>
  <p>左の2画面は操作デモ、右側はPWA・Androidの実画面です。人物・グループ・招待コードはすべて架空で、この比較ページの入力は保存・送信されません。</p>
- <nav class="sharing-jump" aria-label="比較する画面"><a href="#old-version">従来の接続</a><a href="#new-version">1.5.15 の共有操作</a><a href="#pwa-version">PWA 1.5.0 の実画面</a><a href="#tsunami-version">以前の津波地図</a><a href="#pwa-1617-version">PWA 1.6.0</a><a href="#android-1518-version">Android 1.5.18</a><a href="#pwa-161-version">PWA 1.6.1</a><a href="#android-1519-version">Android 1.5.19 →</a><a href="#android-1520-version">Android 1.5.20 →</a></nav>
+ <nav class="sharing-jump" aria-label="比較する画面"><a href="#quality-pwa">最新PWA 1.6.3</a><a href="#quality-android">最新Android 1.5.25</a><a href="#old-version">従来の接続</a><a href="#new-version">1.5.15 の共有操作</a><a href="#pwa-version">PWA 1.5.0 の実画面</a><a href="#tsunami-version">以前の津波地図</a><a href="#pwa-1617-version">PWA 1.6.0</a><a href="#android-1518-version">Android 1.5.18</a><a href="#pwa-161-version">PWA 1.6.1</a><a href="#android-1519-version">Android 1.5.19 →</a><a href="#android-1520-version">Android 1.5.20 →</a></nav>
 </header>
 <main class="board sharing-board">
  <section class="sharing-view" id="old-version" aria-labelledby="old-label">
@@ -128,6 +128,8 @@
   <div class="segments" aria-label="Android会場画面"><button data-venue-android="01-credentials" aria-pressed="true">参加</button><button data-venue-android="02-name" aria-pressed="false">名前</button><button data-venue-android="03-safety" aria-pressed="false">安否</button><button data-venue-android="04-map" aria-pressed="false">地図</button></div>
   <figure><img id="venue-android-image" src="assets/venue-android-1.5.24/01-credentials.png" alt="Android 1.5.24の会場参加画面。架空データによるエミュレーター試験。" style="width:100%;height:auto;border-radius:18px"><figcaption>公開サーバーに接続したAndroidエミュレーターの実装画面</figcaption></figure>
  </section>
+<section class="sharing-view" id="quality-pwa" aria-labelledby="quality-pwa-label"><div class="comparison-caption"><p class="comparison-label" id="quality-pwa-label">PWA 1.6.3 · UIの仕上げ</p><p class="comparison-summary">読みやすい補助文字、押しやすい地図ボタン、固定した詳細の主要操作。文字拡大・短い画面・キーボード操作に対応。</p></div><div class="screenshot-tabs" aria-label="PWAの画面"><button data-quality-pwa="map" aria-pressed="false">地図</button><button data-quality-pwa="people" aria-pressed="true">一覧</button><button data-quality-pwa="response" aria-pressed="false">対応</button><button data-quality-pwa="detail" aria-pressed="false">詳細</button><button data-quality-pwa="safety" aria-pressed="false">安否</button><button data-quality-pwa="settings" aria-pressed="false">設定</button><button data-quality-pwa="materials" aria-pressed="false">資材</button></div><figure class="pwa-screen"><img id="quality-pwa-image" src="assets/ui-pwa-1.6.3/people.png" alt="PWA 1.6.3の実装画面。架空データ。"><figcaption>公開版と同じコードを専用ブラウザーで操作した実装画面</figcaption></figure></section>
+<section class="sharing-view" id="quality-android" aria-labelledby="quality-android-label"><div class="comparison-caption"><p class="comparison-label" id="quality-android-label">Android 1.5.25 · UIの仕上げ</p><p class="comparison-summary">一覧の統計を読みやすくし、対応詳細の担当・進捗・緊急度を整理。文字拡大と48dpの操作領域を改善。</p></div><div class="screenshot-tabs" aria-label="Androidの画面"><button data-quality-android="map" aria-pressed="false">地図</button><button data-quality-android="people" aria-pressed="true">一覧</button><button data-quality-android="response" aria-pressed="false">対応</button><button data-quality-android="detail" aria-pressed="false">詳細</button><button data-quality-android="safety" aria-pressed="false">安否</button><button data-quality-android="settings" aria-pressed="false">設定</button><button data-quality-android="materials" aria-pressed="false">資材</button></div><figure class="pwa-screen"><img id="quality-android-image" src="assets/ui-android-1.5.25/people.png" alt="Android 1.5.25の実装画面。架空データ。"><figcaption>Androidエミュレーターの実装画面（架空の訓練データ）</figcaption></figure></section>
 </main>
 <footer class="sharing-footer">左の2画面は機能を説明するデモ、右のPWA・Android画面は実装版のスクリーンショットです。<br>既存の <a href="index.html">Web 1.6.17 までの画面比較</a>も引き続き確認できます。</footer>
 <script>
@@ -161,6 +163,8 @@
  for(const button of document.querySelectorAll('[data-tsunami-screen]'))button.onclick=()=>{const screen=tsunamiScreens[button.dataset.tsunamiScreen];for(const other of document.querySelectorAll('[data-tsunami-screen]'))other.setAttribute('aria-pressed',String(other===button));$('tsunami-screenshot').src=`assets/pwa-tsunami/${screen.file}.png`;$('tsunami-screenshot').alt=`${screen.caption}。熱海津波計算地図、海岸の基準地点3m、10m格子。`;$('tsunami-screenshot-caption').textContent=screen.caption;};
  for(const button of document.querySelectorAll('[data-venue-pwa]'))button.onclick=()=>{for(const other of document.querySelectorAll('[data-venue-pwa]'))other.setAttribute('aria-pressed',String(other===button));$('venue-pwa-image').src=`assets/venue-pwa-1.6.2/${button.dataset.venuePwa}.png`;};
  for(const button of document.querySelectorAll('[data-venue-android]'))button.onclick=()=>{for(const other of document.querySelectorAll('[data-venue-android]'))other.setAttribute('aria-pressed',String(other===button));$('venue-android-image').src=`assets/venue-android-1.5.24/${button.dataset.venueAndroid}.png`;};
+
+ for(const [platform,version] of [['pwa','1.6.3'],['android','1.5.25']])for(const button of document.querySelectorAll(`[data-quality-${platform}]`))button.onclick=()=>{for(const other of document.querySelectorAll(`[data-quality-${platform}]`))other.setAttribute('aria-pressed',String(other===button));const image=$(`quality-${platform}-image`);image.src=`assets/ui-${platform}-${version}/${button.getAttribute(`data-quality-${platform}`)}.png`;image.alt=`${platform} ${version} ${button.textContent}の実装画面（架空データ）`;};
 })();
 </script>
 </body></html>
